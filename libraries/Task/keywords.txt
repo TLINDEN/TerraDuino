@@ -1,0 +1,14 @@
+Task		KEYWORD1
+TaskScheduler	KEYWORD1
+TimedTask	KEYWORD1
+TriggeredTask	KEYWORD1
+
+canRun		KEYWORD2
+incRunTime	KEYWORD2
+NUM_TASKS	KEYWORD2
+resetRunnable	KEYWORD2
+run		KEYWORD2
+setRunnable	KEYWORD2
+setRunTime	KEYWORD2
+
+MAX_TIME	LITERAL1
