@@ -26,6 +26,19 @@ struct Header {
   int version;
 };
 
+struct Settings {
+  bool dst; // daylight savings time
+  int  tz;  // timezone
+  bool b1;
+  bool b2;
+  bool b3;
+  bool b4;
+  int  i1;
+  int  i2;
+  int  i3;
+  int  i4;
+};
+
 struct Channel {
   int id;
   int program;
@@ -51,9 +64,10 @@ struct Program {
 };
 
 struct Database {
-  Header  header;
-  Channel channels[8];
-  Program programs[32];
+  Header   header;
+  Settings settings;
+  Channel  channels[8];
+  Program  programs[32];
 };
 
 extern int dbversion;
@@ -62,7 +76,8 @@ extern int maxprograms;
 
 bool         ee_exists();
 Database     ee_getdb();
-unsigned int ee_init();
+unsigned int ee_init(bool force);
+unsigned int ee_wr_settings(Settings s);
 unsigned int ee_wr_channel(Channel c);
 unsigned int ee_wr_program(Program p);
 

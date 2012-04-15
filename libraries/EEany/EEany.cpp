@@ -18,16 +18,27 @@ Database ee_getdb() {
   return db;
 }
 
-unsigned int ee_init() {
+unsigned int ee_init(bool force) {
   unsigned int written;
   Database db;
 
-  if(ee_exists()) {
-    /* only initialize the db, if empty */
+  if(ee_exists() && !force ) {
+    /* only initialize the db, if empty or forced */
     return 0;
   }
 
   db.header.version = dbversion;
+
+  db.settings.dst = true;
+  db.settings.tz  = 2;
+  db.settings.b1  = false;
+  db.settings.b2  = false;
+  db.settings.b3  = false;
+  db.settings.b4  = false;
+  db.settings.i1  = 0;
+  db.settings.i2  = 0;
+  db.settings.i3  = 0;
+  db.settings.i4  = 0;
 
   for (int cid=0; cid<maxchannels; cid++) {
     db.channels[cid].id      = cid;
@@ -59,12 +70,17 @@ unsigned int ee_init() {
   return written;
 }
 
+unsigned int ee_wr_settings(Settings s) {
+  int address = sizeof(Header);
+  return EEPROM_writeAnything(address, s);
+}
+
 unsigned int ee_wr_channel(Channel c) {
-  int address = sizeof(Header) + (sizeof(Channel) * c.id);
+  int address = sizeof(Header) + sizeof(Settings) + (sizeof(Channel) * c.id);
   return EEPROM_writeAnything(address, c);
 }
 
 unsigned int ee_wr_program(Program p) {
-  int address = sizeof(Header) + (sizeof(Channel) * maxchannels) + (sizeof(Program) * p.id);
+  int address = sizeof(Header) + sizeof(Settings) + (sizeof(Channel) * maxchannels) + (sizeof(Program) * p.id);
   return EEPROM_writeAnything(address, p);
 }
