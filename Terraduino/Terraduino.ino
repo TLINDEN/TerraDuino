@@ -1530,6 +1530,7 @@ void setup() {
   webserver.addCommand("setprogram.html", &www_setprogram);
   webserver.addCommand("programs.html",   &www_programs);
   webserver.addCommand("editprogram.html",&www_editprogram);
+  webserver.addCommand("air.html",        &www_air);
   webserver.begin();
 
   /* booting done, keep status on */
