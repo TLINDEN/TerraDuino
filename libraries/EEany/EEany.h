@@ -61,7 +61,7 @@ struct Program {
   int start_min;       // manual start, MM
   int stop_hour;       // manual stop, HH
   int stop_min;        // manual stop, MM
-  int res1;
+  int cooldown;
   int res2;
   int res3;
   int res4;

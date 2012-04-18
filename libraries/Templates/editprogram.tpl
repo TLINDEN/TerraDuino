@@ -46,6 +46,9 @@ Program: <% id %><br/>
   </tr><tr>
     <td align="right">Stop Verz&ouml;gerung (Minuten)</td>
     <td><input type="text" name="stop_delay" size="2" maxlength="2" value="<% int stopdelay %>"/></td>
+  </tr><tr>
+    <td align="right">Einschalt Verz&ouml;gerung (Cooldown Zeit) (Sekunden)</td>
+    <td><input type="text" name="cooldown" size="2" maxlength="2" value="<% int cooldown %>"/></td>
   </tr>
 </table>
 

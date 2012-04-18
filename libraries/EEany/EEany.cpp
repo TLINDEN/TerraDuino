@@ -63,7 +63,7 @@ unsigned int ee_init(bool force) {
     db.programs[pid].start_min = 0;
     db.programs[pid].stop_hour = 0;
     db.programs[pid].stop_min = 0;
-    db.programs[pid].res1 = 0;
+    db.programs[pid].cooldown = 0;
     db.programs[pid].res2 = 0;
     db.programs[pid].res3 = 0;
     db.programs[pid].res4 = 0;

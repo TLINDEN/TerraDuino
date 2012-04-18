@@ -51,6 +51,8 @@ int pressed    = 0;
 long timerintervall = 500;
 long timer;
 long moment;
+long sttimer;
+long stmoment;
 long airtimerinterval = 7200; // 10 min
 long airtimer;
 long airmoment;
@@ -59,6 +61,7 @@ int channel;
 bool INIT = true;
 bool RUN  = false;
 int runtime;
+long cooldown[] = {0, 0, 0, 0, 0, 0};
 
 int onebyte;
 int command;
@@ -173,6 +176,7 @@ struct DATA_editprogram {
   int stopdelay;
   int stophour;
   int stopmin;
+  int cooldown;
 };
 
 struct DATA_AirList {
@@ -482,6 +486,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
   int bd;
   int ed;
   int typ;
+  int cd;
 
   server.httpSuccess();
 
@@ -512,6 +517,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
     bd   = db.programs[program].start_delay;
     ed   = db.programs[program].stop_delay;
     typ  = db.programs[program].type;
+    cd   = db.programs[program].cooldown;
   }
 
   if (type == WebServer::POST)  {
@@ -529,6 +535,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       if (strcmp(name, "startdelay")== 0){bd      = atoi(value);}
       if (strcmp(name, "stopdelay") == 0){ed      = atoi(value);}
       if (strcmp(name, "type")      == 0){typ     = atoi(value);}
+      if (strcmp(name, "cooldown")  == 0){cd      = atoi(value);}
     }
 
     int error;
@@ -560,6 +567,10 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       data.message = "Fehler: start delay ! 0-65536!";
       error = 1;
     }
+    if(cd < 0 || cd > 65536) {
+      data.message = "Fehler: cooldown ! 0-65536!";
+      error = 1;
+    }
 
     if(error) {
       tpl_editprogram(server, data);
@@ -574,6 +585,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       p.start_delay= bd;
       p.stop_delay = ed;
       p.type       = typ;
+      p.cooldown   = cd;
       ee_wr_program(p);
       data.message = "Programm wurde gespeichert";
       db = ee_getdb();
@@ -586,6 +598,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
   data.stopmin    = em;
   data.startdelay = bd;
   data.stopdelay  = ed;
+  data.cooldown   = cd;
   data.Types[0].value = 0;
   data.Types[0].description = "Astronomisch (Start/Stop Verz&ouml;gerung Einstellen";
   if (typ == 0) {
@@ -886,13 +899,37 @@ void check_switches(bool init) {
    * If init is true, previous state
    * is ignored and state[channel] will be initialized.
    */ 
+
+  // timers only used for cooldown feature,
+  // because this func doesnt have its own timers
+  stmoment = millis();
+  if(stmoment < sttimer) {
+    // millis() rolled over, 50 days are gone, reset timer
+    sttimer = 0;
+  }
+
   for(channel=0; channel<6; channel++) {
     pressed = digitalRead(switches[channel]);
     if(pressed != state[channel] || init) {
       if(manual) {
 	if(pressed) {
 	  digitalWrite(leds[channel],   HIGH);
-	  digitalWrite(relays[channel], LOW);
+	  if(db.programs[db.channels[channel].program].cooldown) {
+	    if(cooldown[channel] > db.programs[db.channels[channel].program].cooldown) {
+	      // ok, it's cooled down enough, switch it
+	      digitalWrite(relays[channel], LOW);
+	      cooldown[channel] = 0;
+	    }
+	    else {
+	      /* add delayed time since last scheduled run
+	       * divided by 1000 (as seconds)
+	       */
+	      cooldown[channel] += (int)(stmoment - sttimer) / 1000;
+	    }
+	  }
+	  else {
+	    digitalWrite(relays[channel], LOW);
+	  }
 	}
 	else {
 	  digitalWrite(leds[channel],   LOW);
@@ -905,6 +942,8 @@ void check_switches(bool init) {
       state[channel] = pressed;
     }
   }
+
+  sttimer = stmoment;
 }
 
 
@@ -933,7 +972,22 @@ void check_timers(bool init) {
 	if(runtime != state[channel] || init) {
 	  if(runtime) {
 	    /* within operation time, turn the channel on */
-	    digitalWrite(relays[channel], LOW);
+	    if(db.programs[db.channels[channel].program].cooldown) {
+	      if(cooldown[channel] > db.programs[db.channels[channel].program].cooldown) {
+		// ok, it's cooled down enough, switch it
+		digitalWrite(relays[channel], LOW);
+		cooldown[channel] = 0;
+	      }
+	      else {
+		/* add delayed time since last scheduled run
+		 * divided by 1000 (as seconds)
+		 */
+		cooldown[channel] += (int)(moment - timer) / 1000;
+	      }
+	    }
+	    else {
+	      digitalWrite(relays[channel], LOW);
+	    }
 	  }
 	  else {
 	    digitalWrite(relays[channel], HIGH);
@@ -1010,6 +1064,9 @@ void sh_channels() {
       Serial << "    Start Delay: " << db.programs[db.channels[i].program].start_delay << " Minuten" << endl;
       Serial << "     Stop Delay: " << db.programs[db.channels[i].program].stop_delay << " Minuten" << endl;
     }
+    if(db.programs[db.channels[i].program].cooldown > 0) {
+      Serial << "Einschalt Verzoegerung: " << db.programs[db.channels[i].program].cooldown << " Sekunden" << endl;
+    }
   }
 }
 
@@ -1028,6 +1085,9 @@ void sh_programs() {
       Serial << "        Typ: Astronomisch" << endl;
       Serial << "    Start Delay: " << db.programs[p].start_delay << " Minuten" << endl;
       Serial << "     Stop Delay: " << db.programs[p].stop_delay << " Minuten" << endl;
+    }
+    if(db.programs[p].cooldown > 0) {
+      Serial << "Einschalt Verzoegerung: " << db.programs[p].cooldown << " Sekunden" << endl;
     }
   }
 }
@@ -1530,7 +1590,6 @@ void setup() {
   webserver.addCommand("setprogram.html", &www_setprogram);
   webserver.addCommand("programs.html",   &www_programs);
   webserver.addCommand("editprogram.html",&www_editprogram);
-  webserver.addCommand("air.html",        &www_air);
   webserver.begin();
 
   /* booting done, keep status on */
