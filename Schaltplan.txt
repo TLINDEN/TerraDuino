@@ -1,0 +1,46 @@
+Erlaeuterung zum Schaltplan terraduino-img.png.
+
+Erklaerung:
+
+ST1-5     - Pinheader (10 bzw 3 polig), Verbindung zum Arduino
+            die entsprechenden Arduino PINs stehen in gruen daneben,
+            ST1 wird nur fuer das Relais Bord verwendet. An Port
+            1-6 (PINs 2-7) sind die Steckdosen angeschlossen, an Port
+            7 (PIN 8) ist der Trafo fuer den Luefter angeschlossen.
+
+S1-6      - 5-polige Steckerbuchsen (1 Pol nicht benutzt), Verbindung
+            zu den Schaltern (Wippschalter mit Status LED), Belegung:
+            1: LED +
+            2: Schalter a
+            3: Schalter b
+            4: LED -
+
+SA        - Wie bei S1-6, nur fuer den Hauptschalter (mainswitch im Code),
+            mit dem man zwischen Automatik und Manuell wechselt.
+
+Rn        - Widerstaende, Werte stehen in grau daneben:
+            10k: Pulldown Widerstand nach GND fuer die Schalter
+            220: Vorwiderstand zwischen Arduino PIN und LED
+
+SENS+LED  - 5-polige Steckerbuchse, Verbindung zur Status LED und zum
+            Sensorstecker auf der Gehaeuserueckseite (DHT22), Belegung:
+            1: LED -
+            2: DHT22 +
+            3: DHT22 Data
+            4: LED +
+            5: DHT22 GND
+
+RTC       - 10-poliger Pinheader zur Anbindung des RTC Timers, dieser
+            wird nur aufgesteckt, PINs 5-10 sind unbenutzt, Belegung:
+            1: RTC GND
+            2: RTC +
+            3: RTC SDA
+            4: RTC SCL
+
+SPEAKER   - 5-polige Steckerbuchse, Verbindung zum PC Speaker, PINs
+            2 und 3 sind unbenutzt, Belegung:
+            1: Speaker + (Ansteuerung via Arduino)
+            4: Speaker GND
+
++5V und GND liegen auf ST2 1+2 und werden auf der Platine jeweils
+auf mehrere Busse verteilt.
