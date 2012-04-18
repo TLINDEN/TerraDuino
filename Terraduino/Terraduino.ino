@@ -51,6 +51,10 @@ int pressed    = 0;
 long timerintervall = 500;
 long timer;
 long moment;
+long airtimerinterval = 7200; // 10 min
+long airtimer;
+long airmoment;
+bool airon;
 int channel;
 bool INIT = true;
 bool RUN  = false;
@@ -171,6 +175,19 @@ struct DATA_editprogram {
   int stopmin;
 };
 
+struct DATA_AirList {
+  String current;
+  String description;
+  int id;
+};
+
+struct DATA_air {
+  DATA_AirList Air[2];
+  String message;
+  int tmax;
+  int tmin;
+};
+
 
 /* templates need to be included after template vars definitions */
 #include "Templates.h"
@@ -224,7 +241,7 @@ void www_home(WebServer &server, WebServer::ConnectionType type, char *, bool) {
     index_vars.temp     = temperature();
     index_vars.humidity = humidity();
  
-    tpl_index(webserver, index_vars);
+    tpl_index(server, index_vars);
   }
 }
 
@@ -253,7 +270,7 @@ void www_channels(WebServer &server, WebServer::ConnectionType type, char *, boo
       data.Channels[i] = c;
     }
 
-    tpl_channels(webserver, data);
+    tpl_channels(server, data);
   }
 }
 
@@ -327,7 +344,7 @@ void www_setdate(WebServer &server, WebServer::ConnectionType type, char *, bool
     data.dst = 0;
   }
 
-  tpl_setdate(webserver, data);
+  tpl_setdate(server, data);
 }
 
 
@@ -365,7 +382,7 @@ void www_setip(WebServer &server, WebServer::ConnectionType type, char *, bool) 
     db = ee_getdb();
   }
 
-  tpl_setip(webserver, data);
+  tpl_setip(server, data);
 }
 
 
@@ -388,13 +405,13 @@ void www_setprogram(WebServer &server, WebServer::ConnectionType type, char *url
       }
       if(channel < 0 || channel > 5) {
 	data.message = "Fehler: Unbekannter Steuerkanal!";
-	tpl_setprogram(webserver, data);
+	tpl_setprogram(server, data);
 	return;
       }
     }
     else {
       data.message = "Fehler: Channel ID nicht angegeben!";
-      tpl_setprogram(webserver, data);
+      tpl_setprogram(server, data);
       return;
     }
   }
@@ -412,7 +429,7 @@ void www_setprogram(WebServer &server, WebServer::ConnectionType type, char *url
 
     if(program < 0 || program > 31) {
       data.message = "Fehler: Unbekanntes Programm!";
-      tpl_setprogram(webserver, data);
+      tpl_setprogram(server, data);
       return;
     }
     else {
@@ -431,7 +448,7 @@ void www_setprogram(WebServer &server, WebServer::ConnectionType type, char *url
     data.Programs[p] = P;
   }
 
-  tpl_setprogram(webserver, data);
+  tpl_setprogram(server, data);
 }
 
 
@@ -450,7 +467,7 @@ void www_programs(WebServer &server, WebServer::ConnectionType type, char *url_t
     for (int p=0; p<maxprograms; p++) {
       data.Programs[p] = prog2web(p);
     }
-    tpl_programs(webserver, data);
+    tpl_programs(server, data);
   }
 }
 
@@ -479,13 +496,13 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       }
       if(program < 0 || program > 31) {
 	data.message = "Fehler: Unbekanntes Programm!";
-	tpl_editprogram(webserver, data);
+	tpl_editprogram(server, data);
 	return;
       }
     }
     else {
       data.message = "Fehler: Program ID nicht angegeben!";
-      tpl_editprogram(webserver, data);
+      tpl_editprogram(server, data);
       return;
     }
     bh   = db.programs[program].start_hour;
@@ -545,7 +562,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
     }
 
     if(error) {
-      tpl_editprogram(webserver, data);
+      tpl_editprogram(server, data);
       return;
     }
     else {
@@ -580,8 +597,72 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
     data.Types[1].current = "selected='selected'";
   }
 
-  tpl_editprogram(webserver, data);
+  tpl_editprogram(server, data);
 }
+
+
+
+void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
+  DATA_air data;
+
+  int isactive;
+  int tmin;
+  int tmax;
+
+  server.httpSuccess();
+
+  if (type == WebServer::POST)  {
+    char name[32];
+    char value[32];
+    bool parsing = true;
+
+    while (parsing) {
+      parsing = server.readPOSTparam(name, 32, value, 32);
+      if (strcmp(name, "active")  == 0){isactive = atoi(value);}
+      if (strcmp(name, "tmin")    == 0){tmin     = atoi(value);}
+      if (strcmp(name, "tmax")    == 0){tmax     = atoi(value);}
+    }
+
+    if(tmin < 0 || tmin > 65 || tmax < 0 || tmax > 65) {
+      data.message = "Fehler: Temperatur 0-65!";
+      tpl_air(server, data);
+      return;
+    }
+    else {
+      Settings S = db.settings;
+      if(isactive) {
+	S.aircondition = true;
+      }
+      else {
+	S.aircondition = false;
+      }
+      S.air_tmin = tmin;
+      S.air_tmax = tmax;
+      ee_wr_settings(S);
+      data.message = "Klimaeinstellungen gespeichert";
+      db = ee_getdb();
+    }
+  }
+
+  data.tmin = db.settings.air_tmin;
+  data.tmax = db.settings.air_tmax;
+
+  data.Air[0].id = 0;
+  data.Air[0].description = "Aktiv";
+  if(db.settings.aircondition == false) {
+    data.Air[0].current = "selected='selected'";
+  }
+
+  data.Air[1].id = 1;
+  data.Air[1].description = "Inaktiv";
+  if(db.settings.aircondition == true) {
+    data.Air[1].current = "selected='selected'";
+  }
+
+  tpl_air(server, data);
+}
+
+
 
 
 /*
@@ -883,6 +964,23 @@ void sh_temphumidate() {
   Serial << "Temperature: " << T << " *C" << endl;
   Serial << "   Humidity: " << h << " %" << endl;
   Serial << hour(t) << ':' << minute(t) << ':' << second(t) << ' ' << day(t) << '.' << month(t) << '.' << year(t) << endl;
+
+  Serial << "   Air Cond: ";
+  if(db.settings.aircondition) {
+    if(airon) {
+      Serial << "running" << endl;
+    }
+    else {
+      Serial << "running" << endl;
+    }
+    Serial << "       Tmin: " << db.settings.air_tmin << " *C" << endl;
+    Serial << "       Tmax: " << db.settings.air_tmax << " *C" << endl;
+    Serial << "" << endl;
+  }
+  else {
+    Serial << "turned off" << endl;
+  }
+
   if(dst(t)) {
     Serial << "        DST: Sommerzeit" << endl;
   }
@@ -933,6 +1031,79 @@ void sh_programs() {
     }
   }
 }
+
+void sh_air(char parameter[MAXBYTES]) {
+  /*
+   * sets the air condition based on user serial input
+   */
+  if(parameter[0] != '\0') {
+    // air params given, parse it
+    int value[2];
+    int nvalue;
+    char buffer[2];
+    byte idx = 0;
+    for(int i=0; parameter[i]; i++) {
+      if(parameter[i] > '0' || parameter[i] < '9') {
+	// a digit
+	buffer[idx] = parameter[i];
+	idx++;
+	buffer[idx] = '\0';
+      }
+      else if(parameter[i] == ':') {
+	// one value done
+	value[nvalue] = atoi(buffer);
+	nvalue++;
+	idx = 0;
+	buffer[0] = '\0';
+      }
+      else {
+	// no digit, no dot = fail!
+	beep();
+	Serial << "Error: invalid temperature entered, unallowed char: " << parameter[i] << '!' << endl;
+	return;
+      }
+    }
+    if(nvalue != 1) {
+      beep();
+      Serial << "Error: invalid temperatures entered! Enter 2 digits separated by space (0-65 *C)" << endl;
+      return;
+    }
+    else {
+      if(value[0] < 0 || value[0] > 65) {
+	beep();
+	Serial << "Error: invalid Tmin entered, Tmin " << value[0] << " not within 0-65!" << endl;
+	return;
+      }
+      if(value[1] < 0 || value[1] > 65) {
+	beep();
+	Serial << "Error: invalid Tmax entered, Tmax " << value[1] << " not within 0-65!" << endl;
+	return;
+      }
+
+      // if we have done it until here, change the date
+      Settings S     = db.settings;
+      S.aircondition = true;
+      S.air_tmin     = value[0];
+      S.air_tmax     = value[1];
+      ee_wr_settings(S);
+      db = ee_getdb();
+
+      Serial << "Air condition successfully set to Tmin:" << value[0] << ", Tmax: " << value[1] << endl;
+      return;
+    }
+  }
+  else {
+    // no params given, turn it off
+    Settings S     = db.settings;
+    S.aircondition = false;
+    ee_wr_settings(S);
+    db = ee_getdb();
+
+    Serial << "Air condition successfully turned OFF" << endl;
+    return;
+  }
+}
+
 
 void sh_ip(char parameter[MAXBYTES]) {
   /*
@@ -1201,6 +1372,9 @@ void check_command(int command, char parameter[MAXBYTES]) {
   else if(command == 'P') {
     sh_pins();
   }
+  else if(command == 'a') {
+    sh_air(parameter);
+  }
   else if(command == 'h' || command == '?') {
     Serial << "Available commands: " << endl;
     Serial << "  r            - reset EEPROM configuration to defaults and do a soft reset" << endl;
@@ -1210,6 +1384,7 @@ void check_command(int command, char parameter[MAXBYTES]) {
     Serial << "  i x.x.x.x    - set ip address" << endl;
     Serial << "  d DD.MM.YYYY - set date" << endl;
     Serial << "  t HH:MM:SS   - set time (enter wintertime!)" << endl;
+    Serial << "  a Tmin Tmax  - set aircondition, leave params to turn it off" << endl;
     Serial << "  c            - dump channel config" << endl;
     Serial << "  p            - dump program config" << endl;
     Serial << "  P            - dump PIN states" << endl;
@@ -1265,7 +1440,34 @@ void check_shell() {
 }
 
 
+void check_air(bool init) {
+  /*
+   * Turns on aircondition if Tmax has been reached
+   * and turns it off if Tmin has been reached.
+   */
+  if(db.settings.aircondition) {
+    airmoment = millis();
+    if(airmoment < airtimer) {
+      // millis() rolled over, 50 days are gone, reset timer
+      airtimer = 0;
+    }
 
+    if(init || airmoment - airtimer > airtimerinterval) {
+      int T = (int)temperature;
+      if(T > db.settings.air_tmax) {
+	// turn air condition on
+	digitalWrite(air, LOW);
+	airon = true;
+      }
+      else if(T < db.settings.air_tmin) {
+	// turn air condition off
+	digitalWrite(air, HIGH);
+	airon = false;
+      }
+    }
+    airtimer = airmoment;
+  }
+}
 
 
 
@@ -1290,11 +1492,12 @@ void setup() {
   blink();
   pinMode(speaker,    OUTPUT); 
   pinMode(air,        OUTPUT);
+  check_air(INIT);
 
   blink();
   pinMode(mainswitch, INPUT);
   pinMode(mainled,    OUTPUT);
-  check_main(true);
+  check_main(INIT);
 
   for(int i=0; i<6; i++) {
     blink();
@@ -1338,6 +1541,7 @@ void setup() {
 void loop() {
   check_switches(RUN);
   check_timers(RUN);
+  check_air(RUN);
   check_shell();
   webserver.processConnection();
 }

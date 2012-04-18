@@ -9,6 +9,7 @@
 <a href="index.html">Home</a> |
 <a href="setdate.html">Zeit Einstellen</a> | 
 <a href="setip.html">IP Einstellen</a></li> |
+<a href="air.html">Klima Einstellung</a></li> |
 <a href="channels.html">Kan&auml;le</a> |
 <a href="programs.html">Programme</a>
 </p>

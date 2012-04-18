@@ -31,12 +31,12 @@ unsigned int ee_init(bool force) {
 
   db.settings.dst = true;
   db.settings.tz  = 2;
-  db.settings.b1  = false;
+  db.settings.aircondition  = false;
   db.settings.b2  = false;
   db.settings.b3  = false;
   db.settings.b4  = false;
-  db.settings.i1  = 0;
-  db.settings.i2  = 0;
+  db.settings.air_tmin  = 0;
+  db.settings.air_tmin  = 0;
   db.settings.i3  = 0;
   db.settings.i4  = 0;
   db.settings.octet1 = 10;

@@ -29,7 +29,7 @@ struct Header {
 struct Settings {
   bool dst; // daylight savings time
   int  tz;  // timezone
-  bool b1;
+  bool aircondition;
   bool b2;
   bool b3;
   bool b4;
@@ -37,8 +37,8 @@ struct Settings {
   uint8_t octet2;
   uint8_t octet3;
   uint8_t octet4;
-  int  i1;
-  int  i2;
+  int  air_tmin;
+  int  air_tmax;
   int  i3;
   int  i4;
 };

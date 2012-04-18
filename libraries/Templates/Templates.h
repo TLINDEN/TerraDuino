@@ -1,28 +1,35 @@
+P(air_content_31) = "</table>";
 P(setip_content_8) = "Sie ihn resetten: Serielle Schnittstelle (9600,1,N), booten,";
 P(index_content_15) = "<tr>";
 P(editprogram_content_32) = "<td align=\"right\">Stop Verz&ouml;gerung (Minuten)</td>";
 P(editprogram_content_19) = "</tr><tr>";
+P(air_content_16) = "</td>";
 P(setdate_content_19) = "<tr>";
 P(channels_content_5) = "<th>Programm Nummer</th>";
 P(programs_content_13) = "</tr>";
 P(setprogram_content_5) = "<form name=\"setprogram\" action=\"setprogram.html\" method=\"POST\">";
 P(editprogram_content_10) = "<tr>";
+P(air_content_12) = "<select name=\"active\">";
 P(index_content_26) = "</td>";
+P(air_content_22) = "<tr>";
 P(editprogram_content_16) = "</tr><tr>";
 P(setip_content_6) = "Wenn Sie einen Fehler gemacht haben sollten und Sie den";
 P(setip_content_3) = "Geben Sie eine statische IP Adresse ein, die in Ihrem LAN";
 P(setip_content_20) = "<input type=\"submit\" name=\"submit\" value=\"Einstellen\"/>";
 P(setprogram_title_1) = "Zuordnung Steuerkanal zu Programm Einstellen";
+P(air_content_4) = "eingeschaltet werden soll und bei welchen Grenzwerten.";
 P(channels_content_10) = "<tr>";
 P(setdate_content_6) = "<table border=\"0\">";
 P(editprogram_title_1) = "Programm Einstellen";
 P(setdate_content_39) = "<input type=\"submit\" name=\"submit\" value=\"Einstellen\"/>";
 P(setip_content_10) = "bootet dann mit der default Adresse: <b>10.0.0.1</b>.";
+P(air_content_10) = "<td align=\"right\">Aktivieren</td>";
 P(setdate_content_35) = "</td>";
 P(setdate_content_11) = "<tr>";
 P(editprogram_content_9) = "<table border=\"0\">";
 P(setdate_content_40) = "</td>";
 P(editprogram_content_6) = "Program: <% id %><br/>";
+P(air_content_26) = "<tr>";
 P(programs_content_3) = "<tr>";
 P(channels_content_7) = "<th>Programm</th>";
 P(index_content_9) = "<tr>";
@@ -40,13 +47,17 @@ P(editprogram_content_8) = "<p>Einstellungen:</p>";
 P(setprogram_content_3) = "</p>";
 P(setprogram_content_13) = "<input type=\"submit\" name=\"submit\" value=\"Einstellen\"/>";
 P(setdate_content_1) = "<h4>Datum und Uhrzeit Einstellen</h4>";
+P(air_content_18) = "<tr>";
 P(channels_content_2) = "<table border=\"0\">";
 P(setdate_content_43) = "</form>";
 P(editprogram_content_36) = "<input type=\"submit\" name=\"submit\" value=\"Einstellen\"/>";
 P(editprogram_content_20) = "<td align=\"right\">Start Minute</td>";
+P(air_content_11) = "<td>";
 P(programs_content_5) = "<th>Programm Modus</th>";
 P(index_content_1) = "<h4>&Uuml;bersicht</h4>";
+P(air_content_1) = "<h4>Klima Einstellung</h4>";
 P(setdate_content_3) = "Es ist insbesondere bei der Uhrzeit ratsam, sich zu beeilen.</p>";
+P(air_content_8) = "<table border=\"0\">";
 P(setdate_content_23) = "<tr>";
 P(setdate_content_28) = "<td align=\"right\">Sekunde:</td>";
 P(base_content_right) = 
@@ -58,6 +69,7 @@ P(editprogram_content_17) = "<td align=\"right\">Start Stunde</td>";
 P(setdate_content_20) = "<td align=\"right\">Stunde:</td>";
 P(setip_content_13) = "<form name=\"setip\" action=\"setip.html\" method=\"POST\">";
 P(channels_content_4) = "<th>Kanal</th>";
+P(air_content_15) = "</select>";
 P(editprogram_content_25) = "</tr><tr>";
 P(setip_content_21) = "</form>";
 P(setip_content_1) = "<h4>IP Adresse Einstellen</h4>";
@@ -66,31 +78,39 @@ P(editprogram_content_12) = "<select name=\"type\">";
 P(setdate_content_16) = "<td align=\"right\">Jahr:</td>";
 P(setdate_content_10) = "</tr>";
 P(editprogram_content_3) = "</p>";
+P(air_title_1) = "Klima Einstellung";
 P(index_content_21) = "<tr>";
 P(setprogram_content_8) = "Zugeordnetes Programm:";
 P(setdate_content_31) = "<tr>";
 P(programs_content_2) = "<table border=\"0\">";
+P(air_content_29) = "</td>";
 P(programs_content_7) = "</tr>";
 P(setip_content_19) = "<br/>";
 P(editprogram_content_37) = "</form>";
 P(index_content_14) = "</tr>";
+P(air_content_3) = "Stellen Sie ein, ob bei Temperatur&auml;nderungen der L&uuml;fter";
 P(editprogram_content_5) = "<form name=\"editprogram\" action=\"editprogram.html\" method=\"POST\">";
 P(programs_content_4) = "<th>Program Nummer</th>";
+P(air_content_25) = "</tr>";
 P(setip_content_9) = "\"R\" eingeben (Ohne Anf&uuml;hrungszeichen!). Der Terraduino";
 P(setip_content_2) = "<p>";
+P(air_content_9) = "<tr>";
 P(setdate_content_30) = "</tr>";
 P(index_content_20) = "</tr>";
 P(index_content_3) = "<tr>";
+P(air_content_7) = "<form name=\"setdate\" action=\"air.html\" method=\"POST\">";
 P(editprogram_content_15) = "</select>";
 P(programs_content_14) = "</table>";
 P(setdate_title_1) = "Datum und Uhrzeit Einstellen";
+P(air_content_17) = "</tr>";
 P(setip_content_7) = "Terraduino nicht mehr erreichen k&ouml;nnen, m&uuml;ssen";
 P(setprogram_content_14) = "</form>";
+P(air_content_5) = "</p>";
+P(setdate_content_22) = "</tr>";
 P(base_title_left) = 
   "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">"
   "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"de-de\" lang=\"de-de\" dir=\"ltr\">"
   "<head><title>";
-P(setdate_content_22) = "</tr>";
 P(editprogram_content_26) = "<td align=\"right\">Stop Minute</td>";
 P(setprogram_content_2) = "<p>";
 P(editprogram_content_31) = "</tr><tr>";
@@ -98,8 +118,10 @@ P(setprogram_content_9) = "<select name=\"program\">";
 P(setprogram_content_6) = "Steuerkanal: <% name %><br/>";
 P(setdate_content_8) = "<td align=\"right\">Tag:</td>";
 P(index_content_17) = "</tr>";
+P(air_content_19) = "<td align=\"right\">Tmin (schaltet L&uuml;fter aus):</td>";
 P(index_content_27) = "</tr>";
 P(editprogram_content_1) = "<h4>Programm Einstellen</h4>";
+P(setdate_content_14) = "</tr>";
 P(base_content_left) = 
   "</title>"
   "</head>"
@@ -108,27 +130,30 @@ P(base_content_left) =
   "<a href=\"index.html\">Home</a> |"
   "<a href=\"setdate.html\">Zeit Einstellen</a> | "
   "<a href=\"setip.html\">IP Einstellen</a></li> |"
+  "<a href=\"air.html\">Klima Einstellung</a></li> |"
   "<a href=\"channels.html\">Kan&auml;le</a> |"
   "<a href=\"programs.html\">Programme</a>"
   "</p>";
-P(setdate_content_14) = "</tr>";
-P(index_content_23) = "<td>";
 P(setdate_content_12) = "<td align=\"right\">Monat:</td>";
+P(index_content_23) = "<td>";
 P(setip_content_5) = "anschliessend.<br/>";
 P(setdate_content_5) = "<form name=\"setdate\" action=\"setdate.html\" method=\"POST\">";
 P(index_content_5) = "</tr>";
+P(air_content_2) = "<p>";
 P(channels_content_6) = "<th>Programm Modus</th>";
 P(setprogram_content_12) = "</select>";
 P(programs_content_6) = "<th>Programm</th>";
 P(setip_content_4) = "noch nicht in Verwendung ist. Booten Sie den Terraduino";
-P(index_content_2) = "<table border=\"0\">";
+P(air_content_21) = "</tr>";
 P(setdate_content_18) = "</tr>";
+P(index_content_2) = "<table border=\"0\">";
 P(index_content_8) = "</tr>";
 P(setdate_content_36) = "</tr>";
 P(editprogram_content_11) = "<td align=\"right\">Typ</td>";
 P(index_content_11) = "</tr>";
 P(channels_content_16) = "</table>";
 P(index_content_12) = "<tr>";
+P(air_content_27) = "<td colspan=\"2\">";
 P(index_content_18) = "<tr>";
 P(setdate_content_24) = "<td align=\"right\">Minute:</td>";
 P(editprogram_content_28) = "</tr><tr>";
@@ -141,8 +166,10 @@ P(setdate_content_15) = "<tr>";
 P(index_content_22) = "<td align=\"right\">Status Steuerkan&auml;le:</td>";
 P(editprogram_content_35) = "</table>";
 P(setdate_content_32) = "<td align=\"right\">Sommerzeit:</td>";
+P(air_content_32) = "</form>";
 P(index_title_1) = "Home";
 P(channels_content_3) = "<tr>";
+P(air_content_28) = "<input type=\"submit\" name=\"submit\" value=\"Einstellen\"/>";
 P(setip_content_11) = "</p>";
 P(editprogram_content_22) = "</tr><tr>";
 P(setip_title_1) = "IP Adresse Einstellen";
@@ -152,8 +179,10 @@ P(editprogram_content_2) = "<p>";
 P(setdate_content_2) = "<p>Geben Sie die Werte ein und Dr&uuml;cken Sie \"Einstellen\".";
 P(channels_title_1) = "Kan&auml;le";
 P(setdate_content_34) = "(0 = Winterzeit, 1 = Sommerzeit)";
+P(air_content_23) = "<td align=\"right\">Tmax (schaltet L&uuml;fter ein):</td>";
 P(programs_title_1) = "Programme";
 P(setprogram_content_1) = "<h4>Zuordnung Steuerkanal zu Programm Einstellen</h4>";
+P(air_content_30) = "</tr>";
 
 void tpl_editprogram(WebServer &server, DATA_editprogram data) {
   server.printP(base_title_left);
@@ -441,6 +470,82 @@ void tpl_setip(WebServer &server, DATA_setip data) {
   server.printP(setip_content_20);
 
   server.printP(setip_content_21);
+
+  server.printP(base_content_right);
+
+}
+
+
+void tpl_air(WebServer &server, DATA_air data) {
+  server.printP(base_title_left);
+
+  server.printP(air_title_1);
+
+  server.printP(base_content_left);
+
+  server.printP(air_content_1);
+
+  server.printP(air_content_2);
+
+  server.printP(air_content_3);
+
+  server.printP(air_content_4);
+
+  server.printP(air_content_5);
+
+  server << "<span style=\"color: green\">" << data.message << "</span>" << endl;
+
+  server.printP(air_content_7);
+
+  server.printP(air_content_8);
+
+  server.printP(air_content_9);
+
+  server.printP(air_content_10);
+
+  server.printP(air_content_11);
+
+  server.printP(air_content_12);
+
+  for(int i = 0; i < (sizeof(data.Air) / sizeof(DATA_AirList)); i++) {
+    server << "<option value=\"" << data.Air[i].id << "\" " << data.Air[i].current << ">" << data.Air[i].description << "</option>" << endl;
+
+  }
+  server.printP(air_content_15);
+
+  server.printP(air_content_16);
+
+  server.printP(air_content_17);
+
+  server.printP(air_content_18);
+
+  server.printP(air_content_19);
+
+  server << "<td><input name=\"tmin\" type=\"text\" size=\"2\" maxlength=\"2\" value=\"" << data.tmin << "\"/></td>" << endl;
+
+  server.printP(air_content_21);
+
+  server.printP(air_content_22);
+
+  server.printP(air_content_23);
+
+  server << "<td><input name=\"tmax\" type=\"text\" size=\"2\" maxlength=\"2\" value=\"" << data.tmax << "\"/></td>" << endl;
+
+  server.printP(air_content_25);
+
+  server.printP(air_content_26);
+
+  server.printP(air_content_27);
+
+  server.printP(air_content_28);
+
+  server.printP(air_content_29);
+
+  server.printP(air_content_30);
+
+  server.printP(air_content_31);
+
+  server.printP(air_content_32);
 
   server.printP(base_content_right);
 
