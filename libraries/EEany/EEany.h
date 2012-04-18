@@ -33,6 +33,10 @@ struct Settings {
   bool b2;
   bool b3;
   bool b4;
+  uint8_t octet1;
+  uint8_t octet2;
+  uint8_t octet3;
+  uint8_t octet4;
   int  i1;
   int  i2;
   int  i3;

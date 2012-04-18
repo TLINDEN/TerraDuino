@@ -39,6 +39,10 @@ unsigned int ee_init(bool force) {
   db.settings.i2  = 0;
   db.settings.i3  = 0;
   db.settings.i4  = 0;
+  db.settings.octet1 = 10;
+  db.settings.octet2 = 0;
+  db.settings.octet3 = 0;
+  db.settings.octet4 = 1;
 
   for (int cid=0; cid<maxchannels; cid++) {
     db.channels[cid].id      = cid;
