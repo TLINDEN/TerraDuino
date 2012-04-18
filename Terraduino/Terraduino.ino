@@ -5,10 +5,12 @@
  *
  */
 
+#include <MemoryFree.h>
 
 /* Sunrise times stored as progmem table */
 #include "Flash.h"
 #include "Sunrise.h"
+#include "Messages.h"
 
 /* sensor lib */
 #include "DHT.h"
@@ -827,7 +829,7 @@ float temperature() {
   /* read sensor T */
   float t = dht.readTemperature();
   if (isnan(t)) {
-    Serial.println("Failed to read from DHT");
+    Serial << f_failed_dht << endl;
   }
   else {
     return t;
@@ -838,7 +840,7 @@ float humidity() {
   /* read sensor H */
   float h = dht.readHumidity();
   if (isnan(h)) {
-    Serial.println("Failed to read from DHT");
+    Serial << f_failed_dht << endl;
   }
   else {
     return h;
@@ -1015,35 +1017,35 @@ void sh_temphumidate() {
   int sunsethour    = (end - (end % 60)) / 60;
   int sunsetminute  = end % 60;
 
-  Serial << "Temperature: " << T << " *C" << endl;
-  Serial << "   Humidity: " << h << " %" << endl;
+  Serial << f_sht_temp << T << f_grad << endl;
+  Serial << f_sht_hum << h << f_percent << endl;
   Serial << hour(t) << ':' << minute(t) << ':' << second(t) << ' ' << day(t) << '.' << month(t) << '.' << year(t) << endl;
 
-  Serial << "   Air Cond: ";
+  Serial << f_sht_aircond;
   if(db.settings.aircondition) {
     if(airon) {
-      Serial << "running" << endl;
+      Serial << f_sht_run<< endl;
     }
     else {
-      Serial << "running" << endl;
+      Serial << f_sht_run << endl;
     }
-    Serial << "       Tmin: " << db.settings.air_tmin << " *C" << endl;
-    Serial << "       Tmax: " << db.settings.air_tmax << " *C" << endl;
-    Serial << "" << endl;
+    Serial << f_sht_tmin << db.settings.air_tmin << f_grad << endl;
+    Serial << f_sht_tmax << db.settings.air_tmax << f_grad << endl;
+    Serial << endl;
   }
   else {
-    Serial << "turned off" << endl;
+    Serial << f_sht_off << endl;
   }
 
   if(dst(t)) {
-    Serial << "        DST: Sommerzeit" << endl;
+    Serial << f_sht_som << endl;
   }
   else {
-    Serial << "        DST: Winterzeit" << endl;
+    Serial << f_sht_win << endl;
   }
 
-  Serial << "    Sunrise: " << sunrisehour << ':' << sunriseminute << endl;
-  Serial << "     Sunset: " << sunsethour << ':' << sunsetminute << endl;
+  Serial << f_sht_sunr << sunrisehour << ':' << sunriseminute << endl;
+  Serial << f_sht_suns << sunsethour << ':' << sunsetminute << endl;
 }
 
 void sh_channels() {
@@ -1194,20 +1196,20 @@ void sh_ip(char parameter[MAXBYTES]) {
       else {
 	// no digit, no dot = fail!
 	beep();
-	Serial << "Error: invalid ip address entered, unallowed char: " << parameter[i] << '!' << endl;
+	Serial << f_sherr_char << parameter[i] << '!' << endl;
 	return;
       }
     }
     if(noctet != 3) {
       beep();
-      Serial << "Error: invalid ip address entered! ip must consist of 4 octets separated by . !" << endl;
+      Serial << f_sherr_form << f_sherr_exip << endl;
       return;
     }
     else {
       for(int i=0; i<4; i++) {
 	if(octet[i] < 0 || octet[i] > 255) {
 	  beep();
-	  Serial << "Error: invalid ip address entered, octet " << octet[i] << " not within 0-255!" << endl;
+          Serial << f_sherr_form << f_sherr_exoct << endl;
 	  return;
 	}
       }
@@ -1222,7 +1224,7 @@ void sh_ip(char parameter[MAXBYTES]) {
       // FIXME: maybe doesn't work this way, eventually reboot instead, check this!
       uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
       Ethernet.begin(mac, ip);
-      Serial << "IP address successfully changed to " << octet[0] << '.' << octet[1] << '.' << octet[2] << '.' << octet[3] << endl;
+      Serial << f_sht_ipsav << octet[0] << '.' << octet[1] << '.' << octet[2] << '.' << octet[3] << endl;
       
       return;
     }
@@ -1256,29 +1258,29 @@ void sh_setdate(char parameter[MAXBYTES]) {
       else {
 	// no digit, no dot = fail!
 	beep();
-	Serial << "Error: invalid date entered, unallowed char: " << parameter[i] << '!' << endl;
+	Serial << f_sherr_char << parameter[i] << endl;
 	return;
       }
     }
     if(nvalue != 2) {
       beep();
-      Serial << "Error: invalid date entered! date must consist of 3 digits separated by . !" << endl;
+      Serial << f_sherr_form << f_sherr_ex3digdot << endl;
       return;
     }
     else {
       if(value[0] < 1 || value[0] > 31) {
 	beep();
-	Serial << "Error: invalid day entered, day " << value[0] << " not within 1-31!" << endl;
+        Serial << f_sherr_form << f_sherr_exday << endl;
 	return;
       }
       if(value[1] < 1 || value[1] > 12) {
 	beep();
-	Serial << "Error: invalid month entered, month " << value[1] << " not within 1-12!" << endl;
+        Serial << f_sherr_form << f_sherr_exmon << endl;
 	return;
       }
       if(value[2] < 2010 || value[2] > 3600) {
 	beep();
-	Serial << "Error: invalid year entered, year " << value[2] << " not within 2010-3600!" << endl;
+        Serial << f_sherr_form << f_sherr_exyea << endl;
 	return;
       }
 
@@ -1289,13 +1291,13 @@ void sh_setdate(char parameter[MAXBYTES]) {
       int sekunde= second(t);
       setTime(stunde, min, sekunde, value[0], value[1], value[2]);
 
-      Serial << "Date successfully changed to " << value[0] << '.' << value[1] << '.' << value[2] << endl;
+      Serial << f_sht_datesav << value[0] << '.' << value[1] << '.' << value[2] << endl;
       return;
     }
   }
   else {
     beep();
-    Serial << "Error: Parameter in the form DD.MM.YYYY missing!" << endl;
+    Serial << f_sherr_ddmmmis << endl;
   }
 }
 
@@ -1326,29 +1328,29 @@ void sh_settime(char parameter[MAXBYTES]) {
       else {
 	// no digit, no dot = fail!
 	beep();
-	Serial << "Error: invalid time entered, unallowed char: " << parameter[i] << '!' << endl;
+	Serial << f_sherr_char << parameter[i] << endl;
 	return;
       }
     }
     if(nvalue != 2) {
       beep();
-      Serial << "Error: invalid time entered! time must consist of 3 digits separated by : !" << endl;
+      Serial << f_sherr_form << f_sherr_ex3dig << endl;
       return;
     }
     else {
       if(value[0] < 0 || value[0] > 23) {
 	beep();
-	Serial << "Error: invalid hour entered, hour " << value[0] << " not within 0-23!" << endl;
+        Serial << f_sherr_form << f_sherr_exhour << endl;
 	return;
       }
       if(value[1] < 0 || value[1] > 59) {
 	beep();
-	Serial << "Error: invalid minute entered, minute " << value[1] << " not within 0-59!" << endl;
+        Serial << f_sherr_form << f_sherr_exmin << endl;
 	return;
       }
       if(value[2] < 0 || value[2] > 59) {
 	beep();
-	Serial << "Error: invalid second entered, second " << value[2] << " not within 0-59!" << endl;
+        Serial << f_sherr_form << f_sherr_exsec << endl;
 	return;
       }
 
@@ -1359,13 +1361,13 @@ void sh_settime(char parameter[MAXBYTES]) {
       int jahr   = year(t);
       setTime(value[0], value[1], value[2], tag, monat, jahr);
 
-      Serial << "Time successfully changed to " << value[0] << '.' << value[1] << '.' << value[2] << endl;
+      Serial << f_sht_timesav<< value[0] << '.' << value[1] << '.' << value[2] << endl;
       return;
     }
   }
   else {
     beep();
-    Serial << "Error: Parameter in the form HH:MM:SS missing!" << endl;
+    Serial << f_sherr_hhmmmis << endl;
   }
 }
 
@@ -1374,25 +1376,25 @@ void sh_pins() {
    * Display a table of our PINs with their current state
    */
   t = gettimeofday();
-  Serial << "Current PIN states:" << endl << endl;
-  Serial << "Switch | MAIN | Ch1 | Ch2 | Ch3 | Ch4 | Ch5 | Ch6" << endl;
-  Serial << "-------+------+-----+-----+-----+-----+-----+-----" << endl;
-  Serial << "  PIN  | " << mainswitch << "  ";
+  Serial << f_shp_tit << endl << endl;
+  Serial << f_shp_head << endl;
+  Serial << f_shp_line << endl;
+  Serial << f_shp_pin << mainswitch << f_shp_2sp;
   for (int i=0; i<6; i++) {
-    Serial << "|  " << switches[i] << " ";
+    Serial << f_shp_pipe << switches[i] << f_shp_2sp;
   }
   Serial << endl;
-  Serial << "-------+------+-----+-----+-----+-----+-----+-----" << endl;
-  Serial << " Mode  |   " << manual << "  ";
+  Serial << f_shp_line << endl;
+  Serial << f_shp_mode << manual << f_shp_2sp;
   for (int i=0; i<6; i++) {
-    Serial << "|   " << state[i] << " ";
+    Serial << f_shp_pipe << state[i] << f_shp_2sp;
   }
   Serial << endl;
-  Serial << "-------+------+-----+-----+-----+-----+-----+-----" << endl;
-  Serial << " Relay |      ";
+  Serial << f_shp_line << endl;
+  Serial << f_shp_rel;
   for (int i=0; i<6; i++) {
     int ops = operate(i, t);
-    Serial << "|   " << ops << " ";
+    Serial << f_shp_pipe << ops << f_shp_2sp;
   }
   Serial << endl << endl;
 }
@@ -1402,13 +1404,13 @@ void check_command(int command, char parameter[MAXBYTES]) {
    * Execute command taken from serial port
    */
   if (command == 'r') {
-    Serial << "Resetting Config" << endl;
+    Serial << f_sh_reset << endl;
     ee_init(INIT);
-    Serial << "Initiating a soft reset" << endl;
+    Serial << f_sh_initres << endl;
     software_Reset();
   }
   else if(command == 'b') {
-    Serial << "Initiating a soft reset" << endl;
+    Serial << f_sh_initres << endl;
     software_Reset();
   }
   else if(command == 's') {
@@ -1436,23 +1438,11 @@ void check_command(int command, char parameter[MAXBYTES]) {
     sh_air(parameter);
   }
   else if(command == 'h' || command == '?') {
-    Serial << "Available commands: " << endl;
-    Serial << "  r            - reset EEPROM configuration to defaults and do a soft reset" << endl;
-    Serial << "  b            - do a soft reset" << endl;
-    Serial << "  s            - display T and H sensor data and date+time" << endl;
-    Serial << "  i            - show ip address" << endl;
-    Serial << "  i x.x.x.x    - set ip address" << endl;
-    Serial << "  d DD.MM.YYYY - set date" << endl;
-    Serial << "  t HH:MM:SS   - set time (enter wintertime!)" << endl;
-    Serial << "  a Tmin Tmax  - set aircondition, leave params to turn it off" << endl;
-    Serial << "  c            - dump channel config" << endl;
-    Serial << "  p            - dump program config" << endl;
-    Serial << "  P            - dump PIN states" << endl;
-    Serial << "  h            - show help" << endl;
+    Serial << f_sh_help;
   }
   else {
     beep();
-    Serial.println("Invalid Command (try 'h' to get help)!");
+    Serial << f_sh_inv << command << endl;
   }
 }
 
@@ -1465,6 +1455,7 @@ void check_shell() {
    * get some infos from the controller if anything else
    * fails
    */
+   
   while (Serial.available() > 0) {
     onebyte = Serial.read();
     if(onebyte == '\r' ||onebyte == '\n') {
@@ -1472,7 +1463,8 @@ void check_shell() {
       check_command(command, parameter);
       index        = 0;
       parameter[0] = '\0';
-      command      = 0;
+      command      = '\0';
+      parametermode= false;
     }
     else if(onebyte == ' ') {
       parametermode = true;
@@ -1481,10 +1473,10 @@ void check_shell() {
       if(parametermode) {
 	if(index == MAXBYTES) {
 	  beep();
-	  Serial << "Error: too many chars entered. Try Again!" << endl;
 	  index        = 0;
 	  parameter[0] = '\0';
-	  command      = 0;
+	  command      = '\0';
+          parametermode= false;
 	}
 	else {
 	  parameter[index] = onebyte;
@@ -1540,42 +1532,57 @@ void setup() {
   blink();
   setSyncProvider(RTC.get);
   if(timeStatus()!= timeSet) 
-     Serial.println("Unable to sync with the RTC");
+     Serial << f_rtc_fail << endl;
   else
-     Serial.println("RTC has set the system time");
+     Serial << f_rtc_ok << endl;
 
   t = now();
-
+  
   blink();
+  Serial << "init DHT22" << endl;
   dht.begin();
 
   blink();
+  Serial << "init Wire" << endl;
+  Wire.begin();
+
+  blink();
+  Serial << "init eeprom" << endl;
+  ee_init(RUN);
+  
+  blink();
+  Serial << "read db from eeprom";
+  db = ee_getdb();
+  Serial << "    got db version ";
+  Serial << db.header.version << endl;
+
+  blink();
+  Serial << "init speaker and air" << endl;
   pinMode(speaker,    OUTPUT); 
   pinMode(air,        OUTPUT);
   check_air(INIT);
 
   blink();
+  Serial << "init main switch" << endl;
   pinMode(mainswitch, INPUT);
   pinMode(mainled,    OUTPUT);
   check_main(INIT);
 
+  Serial << "init switches ";
   for(int i=0; i<6; i++) {
     blink();
+    Serial << i;
     pinMode(switches[i], INPUT);
     pinMode(leds[i],     OUTPUT);
     pinMode(relays[i],   OUTPUT);
   }
+  Serial << "   - flags ";
   check_switches(INIT);
+  Serial << "done" << endl;
 
   blink();
+  Serial << "init timers" << endl;
   check_timers(INIT);
-
-  blink();
-  Wire.begin();
-
-  blink();
-  ee_init(RUN);
-  db = ee_getdb();
 
   blink();
   uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
@@ -1595,6 +1602,7 @@ void setup() {
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
   beep();
+  Serial << "freeMemory: " <<  freeMemory() << endl;
 }
 
 
@@ -1604,4 +1612,5 @@ void loop() {
   check_air(RUN);
   check_shell();
   webserver.processConnection();
+   //Serial << "freeMemory: " <<  freeMemory() << endl;
 }
