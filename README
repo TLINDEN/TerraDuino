@@ -1,3 +1,0 @@
-Hier wird der Sourcecode für Terraduino veroeffentlicht, mit dem ich mein Terrarium steuere.
-
-Der Controller basiert auf einem Arduino Board, er wird 6 Stromkreise steuern mit astronnomischen Start- und Stopzeiten, Temperatursensor, Lüfter etc.
