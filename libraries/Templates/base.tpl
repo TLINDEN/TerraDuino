@@ -5,8 +5,15 @@
 </title>
 </head>
 <body>
+<p>
+<a href="index.html">Home</a> |
+<a href="setdate.html">Zeit Einstellen</a> | 
+<a href="setip.html">IP Einstellen</a></li> |
+<a href="channels.html">Kan&auml;le</a> |
+<a href="programs.html">Programme</a>
+</p>
 <% insert content %>
 <hr>
-<p>powered by TemplateDuino and Webduino</p>
+<p>powered by <a href="https://github.com/TLINDEN/TerraDuino">TerraDuino</a></p>
 </body>
 </html>
