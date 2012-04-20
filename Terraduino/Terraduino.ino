@@ -91,8 +91,8 @@ char parsevalue[32];
 bool parsing = true;
 
 /* PINs */
-const uint8_t switches[] = { 51, 49, 47, 45, 43, 41 };
-const uint8_t leds[]     = { 50, 48, 46, 44, 42, 40 };
+const uint8_t switches[] = { 15, 49, 47, 45, 43, 41 };
+const uint8_t leds[]     = { 16, 48, 46, 44, 42, 40 };
 const uint8_t relays[]   = { 36, 34, 32, 30, 28, 26 };
 uint8_t state[]          =  { 0, 0, 0, 0, 0, 0 };
 uint8_t runstate[]       =  { 0, 0, 0, 0, 0, 0 };
@@ -336,7 +336,7 @@ void tpl_setip(WebServer &server) {
 }
 
 void tpl_setair(WebServer &server) {
-  server << hhead << tip << hmenu << chair;
+  server << hhead << tair << hmenu << chair;
   server << msg1 << post.s1 << msg2;
   server << airform << tableair;
 
@@ -554,7 +554,6 @@ void www_setprogram(WebServer &server, WebServer::ConnectionType type, char *url
       return;
     }
     else {
-      Serial << "Assigning program " << post.i2 << " to channel " << post.i1 << endl;
       Channel c = db.channels[post.i1];
       c.program = post.i2;
       ee_wr_channel(c);
@@ -582,12 +581,9 @@ void www_programs(WebServer &server, WebServer::ConnectionType type, char *url_t
 
 
 void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
-  Serial << "resetpost" << endl;
   resetpost();
   server.httpSuccess();
-  Serial << "success" << endl;
   if (type == WebServer::GET)  {
-    Serial << "get" << endl;
     URLPARAM_RESULT rc;
     if (strlen(url_tail)) {
       while (strlen(url_tail)) {
@@ -599,7 +595,6 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
 	tpl_editprogram(server);
 	return;
       }
-      Serial << "got id by get" << endl;
     }
     else {
       err_unknprogid.copy(post.s1);
@@ -609,11 +604,8 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
   }
 
   if (type == WebServer::POST)  {
-    Serial << "post" << endl;
-    Serial << "var parsing: " << parsing << endl;
     while (parsing) {
       parsing = server.readPOSTparam(parsename, 32, parsevalue, 32);
-      Serial << "POST param: " << parsename << ", value: " << parsevalue << endl;
       if (strcmp(parsename, "0") == 0){post.i1 = atoi(parsevalue);}
       if (strcmp(parsename, "1") == 0){post.i2 = atoi(parsevalue);}
       if (strcmp(parsename, "2") == 0){post.i3 = atoi(parsevalue);}
@@ -626,36 +618,35 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
     }
 
     int error = 0;
-    if(typ < 0 || typ > 1) {
+    if(post.i2 < 0 || post.i2 > 1) {
       err_type.copy(post.s1);
-      editdata.message = "Fehler: type != 0|1!";
       error = 1;
     }
-    if(bh < 0 || bh > 23) {
+    if(post.i3 < 0 || post.i3 > 23) {
       err_hour1.copy(post.s1);
       error = 1;
     }
-    if(bm < 0 || bm > 59) {
+    if(post.i4 < 0 || post.i4 > 59) {
       err_min1.copy(post.s1);
       error = 1;
     }
-    if(eh < 0 || eh > 23) {
+    if(post.i5 < 0 || post.i5 > 23) {
       err_hour2.copy(post.s1);
       error = 1;
     }
-    if(em < 0 || em > 59) {
+    if(post.i6 < 0 || post.i6 > 59) {
       err_min2.copy(post.s1);
       error = 1;
     }
-    if(bd < 0 || bd > 65536) {
+    if(post.i7 < 0 || post.i7 > 65536) {
       err_delay1.copy(post.s1);
       error = 1;
     }
-    if(ed < 0 || ed > 65536) {
+    if(post.i8 < 0 || post.i8 > 65536) {
       err_delay1.copy(post.s1);
       error = 1;
     }
-    if(cd < 0 || cd > 65536) {
+    if(post.i9 < 0 || post.i9 > 65536) {
       err_cooldown.copy(post.s1);
       error = 1;
     }
@@ -673,7 +664,6 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       ee_wr_program(p);
       progdone.copy(post.s1);
       delay(10);
-      Serial << "Saved prog " << post.i1 << endl;
       db = ee_getdb();
     }
   }
@@ -697,7 +687,7 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
 
     if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65) {
       err_air.copy(post.s1);
-      tpl_air(server);
+      tpl_setair(server);
       return;
     }
     else {
@@ -715,7 +705,7 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
       db = ee_getdb();
     }
   }
-  tpl_air(server);
+  tpl_setair(server);
 }
 
 
@@ -930,21 +920,29 @@ void check_switches(bool init) {
 
   for(channel=0; channel<6; channel++) {
     swpressed = digitalRead(switches[channel]);
+    if(swpressed && manual) {
+      // remember how long the channel is already running
+      if(db.programs[db.channels[channel].program].cooldown > 0) {
+        if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
+          cooldown[channel] += (stmoment - sttimer);
+        }
+        else {
+          // reached cooldowntime, init artificially
+          state[channel] = 0;
+        }
+      }
+      if(cooldown[channel] < (db.programs[db.channels[channel].program].cooldown * 60)) {
+         cooldown[channel] += (int)(stmoment - sttimer) / 1000;
+       }
+    }
     if(swpressed != state[channel] || init) {
       if(manual) {
 	if(swpressed) {
 	  digitalWrite(leds[channel],   HIGH);
 	  if(db.programs[db.channels[channel].program].cooldown) {
-	    if(cooldown[channel] > (db.programs[db.channels[channel].program].cooldown / 60)) {
+	    if((cooldown[channel] / 1000) > (db.programs[db.channels[channel].program].cooldown * 60)) {
 	      // ok, it's cooled down enough, switch it
 	      digitalWrite(relays[channel], LOW);
-	      cooldown[channel] = 0;
-	    }
-	    else {
-	      /* add delayed time since last scheduled run
-	       * divided by 1000 (as seconds)
-	       */
-	      cooldown[channel] += (int)(stmoment - sttimer) / 1000;
 	    }
 	  }
 	  else {
@@ -954,6 +952,7 @@ void check_switches(bool init) {
 	else {
 	  digitalWrite(leds[channel],   LOW);
 	  digitalWrite(relays[channel], HIGH);
+          cooldown[channel] = 0;
 	}
       }
       else {
@@ -992,22 +991,25 @@ void check_timers(bool init) {
       t = gettimeofday();
       for(channel=0; channel<6; channel++) {
 	runtime = operate(channel, t);
-        //Serial << "timer - " << channel << ", runtime: " << runtime;
-        //Serial << ", runstate: " << runstate[channel] << endl;
+        if(runtime) {
+          // remember how long the channel is already running
+          if(db.programs[db.channels[channel].program].cooldown > 0) {
+            if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
+              cooldown[channel] += (moment - timer);
+            }
+            else {
+              // reached cooldowntime, init artificially
+              runstate[channel] = 0;
+            }
+          }
+        }
 	if(runtime != runstate[channel] || init) {
 	  if(runtime) {
 	    /* within operation time, turn the channel on */
-	    if(db.programs[db.channels[channel].program].cooldown) {
-	      if(cooldown[channel] > (db.programs[db.channels[channel].program].cooldown / 60)) {
+	    if(db.programs[db.channels[channel].program].cooldown > 0) {
+	      if((cooldown[channel] / 1000) > (db.programs[db.channels[channel].program].cooldown * 60)) {
 		// ok, it's cooled down enough, switch it
 		digitalWrite(relays[channel], LOW);
-		cooldown[channel] = 0;
-	      }
-	      else {
-		/* add delayed time since last scheduled run
-		 * divided by 1000 (as seconds)
-		 */
-		cooldown[channel] += (int)(moment - timer) / 1000;
 	      }
 	    }
 	    else {
@@ -1016,6 +1018,7 @@ void check_timers(bool init) {
 	  }
 	  else {
 	    digitalWrite(relays[channel], HIGH);
+            cooldown[channel] = 0;
 	  }
 	  runstate[channel] = runtime;
 	}
@@ -1625,6 +1628,8 @@ void setup() {
   Serial << "init speaker and air" << endl;
   //pinMode(speaker,    OUTPUT); 
   pinMode(air,        OUTPUT);
+  digitalWrite(air, HIGH);
+  delay(5);
   check_air(INIT);
 
   blink();
