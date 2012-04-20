@@ -26,10 +26,12 @@
 #include <inttypes.h>
 
 /* Webserver */
-#include "SPI.h" // new include
-#include "avr/pgmspace.h" // new include
+#include "SPI.h"
+#include "avr/pgmspace.h"
 #include "Ethernet.h"
 #include "WebServer.h"
+
+#include <stdio.h>
 
 /* defines */
 #define SUNRISE 0
@@ -48,8 +50,9 @@ int stopdelay;
 static uint8_t mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 char endl = '\n';
 bool manual = false;
-int mainstatus = 0;
-int pressed    = 0;
+uint8_t mainstatus = 0;
+uint8_t pressed    = 0;
+uint8_t swpressed  = 0;
 long timerintervall = 500;
 long timer;
 long moment;
@@ -62,11 +65,17 @@ bool airon;
 int channel;
 bool INIT = true;
 bool RUN  = false;
-int runtime;
+uint8_t runtime;
 long cooldown[] = {0, 0, 0, 0, 0, 0};
 
-int onebyte;
-int command;
+// serial parser vars
+int     value[4];
+uint8_t nvalue = 0;
+char    buffer[5];
+byte    idx = 0;
+    
+uint8_t onebyte;
+uint8_t command;
 char parameter[MAXBYTES];
 byte index = 0;
 bool parametermode = false;
@@ -76,17 +85,23 @@ int maxchannels = 8;
 int maxprograms = 32;
 int dbversion   = 1000;
 
+/* post parser vars */
+char parsename[32];
+char parsevalue[32];
+bool parsing = true;
+
 /* PINs */
-int switches[] = { 51, 49, 47, 45, 43, 41 };
-int leds[]     = { 50, 48, 46, 44, 42, 40 };
-int relays[]   = { 36, 34, 32, 30, 28, 26 };
-int state[]   =  { 0, 0, 0, 0, 0, 0 };
+const uint8_t switches[] = { 51, 49, 47, 45, 43, 41 };
+const uint8_t leds[]     = { 50, 48, 46, 44, 42, 40 };
+const uint8_t relays[]   = { 36, 34, 32, 30, 28, 26 };
+uint8_t state[]          =  { 0, 0, 0, 0, 0, 0 };
+uint8_t runstate[]       =  { 0, 0, 0, 0, 0, 0 };
 String names[] = { "70 W Links", "70 W Rechts", "40 W Vorn", "40 W Hinten", "15 W Links", "15 W Rechts"};
-int air        = 24;
-int statusled  = 27;
-int speaker    = 23;
-int mainswitch = 19;
-int mainled    = 18;
+const uint8_t air        = 24;
+const uint8_t statusled  = 27;
+const uint8_t speaker    = 17;
+const uint8_t mainswitch = 19;
+const uint8_t mainled    = 18;
 
 
 /* global objects */
@@ -94,116 +109,286 @@ DHT dht(DHTPIN, DHTTYPE);
 Database db;
 WebServer webserver(PREFIX, 80);
 
-
-/* Webserver template vars */
-struct DATA_ChannelList {
-  int id;
-  int programid;
-  String modus;
-  String name;
-  int operate;
-  String program;
-};
-
-struct DATA_index {
-  DATA_ChannelList Channels[6];
-  int day;
-  int hour;
-  float humidity;
-  int minute;
-  String modus;
-  int month;
-  int second;
-  int sunrisehour;
-  int sunriseminute;
-  int sunsethour;
-  int sunsetminute;
-  float temp;
-  int year;
-};
-
-struct DATA_channels {
-  DATA_ChannelList Channels[6];
-};
-
-struct DATA_setdate {
-  int day;
-  int dst;
-  int hour;
-  String message;
-  int minute;
-  int month;
-  int second;
-  int year;
-};
-
-struct DATA_setip {
-  String message;
-  uint8_t octet1;
-  uint8_t octet2;
-  uint8_t octet3;
-  uint8_t octet4;
-};
-
-struct DATA_ProgramList {
-  String current;
-  String description;
-  String modus;
-  int id;
-};
-
-struct DATA_setprogram {
-  DATA_ProgramList Programs[32];
-  int id;
-  String message;
-};
-
-struct DATA_programs {
-  DATA_ProgramList Programs[32];
-};
-
-struct DATA_TypeList {
-  String current;
-  String description;
-  int value;
-};
-
-struct DATA_editprogram {
-  DATA_TypeList Types[2];
-  int id;
-  String message;
-  int startdelay;
-  int starthour;
-  int startmin;
-  int stopdelay;
-  int stophour;
-  int stopmin;
-  int cooldown;
-};
-
-struct DATA_AirList {
-  String current;
-  String description;
-  int id;
-};
-
-struct DATA_air {
-  DATA_AirList Air[2];
-  String message;
-  int tmax;
-  int tmin;
-};
+/* used to store http post/get vars  and to fill template functions */
+struct POST {
+  int i1;
+  int i2;
+  int i3;
+  int i4;
+  int i5;
+  int i6;
+  int i7;
+  int i8;
+  int i9;
+  int i10;
+  int i11;
+  int i12;
+  char s1[64];
+} post;
 
 
-/* templates need to be included after template vars definitions */
-#include "Templates.h"
+
+
+/*
+ * Webserver output functions
+ */
+ 
+void prog2web(int p, WebServer &server) {
+  // print a human readable version of the given program
+  
+  server << f_shc_pn << p << ' ';
+  
+  if(db.programs[p].type == 1) {
+    server << f_shc_st << f_shc_start;
+    server<< db.programs[p].start_hour << ':' << db.programs[p].start_min;
+    server << bis << f_shc_stop;
+    server << db.programs[p].stop_hour << ':' << db.programs[p].stop_min;
+  }
+  else {
+    server << f_shc_ast << f_shc_stdel << db.programs[p].start_delay << f_shc_min;
+    server << bis << f_shc_stodel << db.programs[p].stop_delay << f_shc_min;
+  }
+  if(db.programs[p].cooldown > 0) {
+    server << bis << f_shc_delay << db.programs[p].cooldown << f_shc_min;
+  }
+}
+
+
+
+void tpl_index(WebServer &server) {
+  server << hhead << thome << hmenu << ch1;
+  server << table;
+  server << tra << tdr << itemp << tde << td << post.i1 << igrad << tde << tre;
+  server << tra << tdr << ihum  << tde << td << post.i2 << iperc << tde << tre;
+  server << tra << tdr << itime << tde << td << post.i3 << '.' << post.i4 << '.' << post.i5;
+  server << ' ' << post.i6 << ':' << post.i7 << ':' << post.i8 << tde << tre;
+  
+  server << tra << tdr << imode << tde << td ;
+  if(manual) {
+    server << imm;
+  }
+  else {
+    server << ima;
+  }
+  server << tde << tre;
+
+  server << tra << tdr << isunr << tde << td << post.i9 << ':' << post.i10 << tde << tre;
+  server << tra << tdr << isuns << tde << td  << post.i11 << ':' << post.i12 << tde << tre;
+  
+  server << tra << tdrt << ichan << tde << td;
+  for (uint8_t i=0; i<6; i++) {
+    server << names[i] << ':';
+    if(manual) {
+      if(state[i] == HIGH) {
+        server << irun;
+      }
+      else {
+        server << ioff;
+      }
+    }
+    else {
+      if(operate(i, t)) {
+        server << irun;
+      }
+      else {
+        server << ioff;
+      }
+    }
+    server << br;
+  }
+  server << tde << tre << tablee << hfoot;
+}
+
+void tpl_channels(WebServer &server) {
+  server << hhead << tchannels << hmenu << chc;
+  server << tablechan;
+
+  for(int i=0; i<6; i++) {
+    server << tra << td;
+    server << chlinkl << i << chlinkr << names[i] << chlinke << tde;
+    server << td;
+    prog2web(db.channels[i].program, server);
+    server << tde;
+  }
+  server << tre << tablee << hfoot;
+}
+
+void tpl_setdate(WebServer &server) {
+  server << hhead << tdate << hmenu << chd;
+  server << msg1 << post.s1 << msg2;
+  server << sdform << tablesd;
+
+  server << tra;
+
+  server << sdfi2 << 0 << sdfv << post.i1 << sdfe << tde;
+  server << sdfi2 << 1 << sdfv << post.i2 << sdfe << tde;
+  server << sdfi4 << 2 << sdfv << post.i3 << sdfe << tde;
+  server << sdfi2 << 3 << sdfv << post.i4 << sdfe << tde;
+  server << sdfi2 << 4 << sdfv << post.i5 << sdfe << tde;
+  server << sdfi2 << 5 << sdfv << post.i6 << sdfe << tde;
+
+  server << tre << tra;
+
+  server << sdfdst << post.i7 << sdfe << sdfdsth << tde << tre;
+
+  server << tablee << submit << forme << hfoot;
+}
+
+void tpl_setprogram(WebServer &server) {
+  server << hhead << tsetp << hmenu << chs;
+  server << msg1 << post.s1 << msg2;
+  
+    server << spform;
+    server << sdchannel << names[post.i1] << br;
+    server << hidden << post.i1 << sdfe;
+    server << sdpc << spsel;
+    for(int i=0; i<maxprograms; i++) {
+      server << opt << i << '"';
+      if(i == db.channels[post.i1].program) {
+        server << selected;
+      }
+      server << '>';
+      prog2web(i, server);
+      server << opte;
+    }
+    server << sele << br << submit << forme;
+  
+  server << hfoot;
+}
+
+void tpl_programs(WebServer &server) {
+  server << hhead << tprog << hmenu << chp;
+  server << msg1 << post.s1 << msg2;
+  server << tableprog;
+  for(int i=0; i<maxprograms; i++) {
+    server << tra << td;
+    server << prlinkl << i << chlinkr << i << chlinke << td;
+    prog2web(i, server);
+    server << tde << tre;
+  }
+  server << tablee << hfoot;
+}
+
+void tpl_editprogram(WebServer &server) {
+  server << hhead << tprogset << hmenu << chps;
+  server << msg1 << post.s1 << msg2;
+  server << spsform << f_shc_pr << post.i1;
+  server << hidden << post.i1 << sdfe;
+
+  server << tableprogset;
+  server << spsel;
+
+  for (int i=0; i<2; i++) {
+    server << opt << i << '"';
+    if(db.programs[post.i1].type == i) {
+      server << selected;
+    }
+    server << '>';
+    if(i == STATIC) {
+      server << f_shc_st;
+    }
+    else {
+      server << f_shc_ast;
+    }
+    server << opte;
+  }
+  server << sele << tde << tre;
+
+  // start 1:hour.i2 2:minute.i3
+  server << tra << tdr << f_shc_start << tde << td;
+  server << spf2 << 2 << sdfv << db.programs[post.i1].start_hour << sdfe << ':';
+  server << spf2 << 3 << sdfv << db.programs[post.i1].start_min << sdfe;
+  server << tde << tre;
+
+  // stop 3:hour.i4 4:minute.i5
+  server << tra << tdr << f_shc_stop << tde << td;
+  server << spf2 << 4 << sdfv << db.programs[post.i1].stop_hour << sdfe << ':';
+  server << spf2 << 5 << sdfv << db.programs[post.i1].stop_min << sdfe;
+  server << tde << tre;
+
+  // startdelay 5:startdelay.i6
+  server << tra << tdr << f_shc_stdel << tde << td;
+  server << spf5 << 6 << sdfv << db.programs[post.i1].start_delay << sdfe;
+  server << tde << tre;
+
+  // startdelay 6:startdelay.i7
+  server << tra << tdr << f_shc_stodel << tde << td;
+  server << spf5 << 7 << sdfv << db.programs[post.i1].stop_delay << sdfe;
+  server << tde << tre;
+
+  // cooldown 7:cooldown.i8
+  server << tra << tdr << spcooldown << tde << td;
+  server << spf5 << 8 << sdfv << db.programs[post.i1].cooldown << sdfe;
+  server << tde << tre;
+
+  server << tablee << submit << forme << hfoot;
+}
+
+void tpl_setip(WebServer &server) {
+  server << hhead << tip << hmenu << chip;
+  server << msg1 << post.s1 << msg2;
+  server << ipform;
+  server << spf3 << 0 << sdfv << db.settings.octet1 << sdfe << '.';
+  server << spf3 << 1 << sdfv << db.settings.octet2 << sdfe << '.';
+  server << spf3 << 2 << sdfv << db.settings.octet3 << sdfe << '.';
+  server << spf3 << 3 << sdfv << db.settings.octet4 << sdfe;
+  server << br << submit << forme << hfoot;
+}
+
+void tpl_setair(WebServer &server) {
+  server << hhead << tip << hmenu << chair;
+  server << msg1 << post.s1 << msg2;
+  server << airform << tableair;
+
+  server << spsel;
+
+  server << opt << 0;
+  if(db.settings.aircondition == 0) {
+    server << selected;
+  }
+  server << '>' << airinactive << opte;
+
+  server << opt << 1;
+  if(db.settings.aircondition == 1) {
+    server << selected;
+  }
+  server << '>' << airactive << opte;
+  server << tde << tre;
+
+  server << tra << tdr << tmin << tde;
+  server << td << spf2 << 2 << sdfv << db.settings.air_tmin << sdfe << tde << tre;
+
+  server << tra << tdr << tmax << tde;
+  server << td << spf2 << 3 << sdfv << db.settings.air_tmax << sdfe << tde << tre;
+
+  server << tablee << submit << forme << hfoot;
+}
 
 /*
  * Webserver display functions
  */
 
+void resetpost() {
+ post.i1 = 0;
+ post.i2 = 0;
+ post.i3 = 0;
+ post.i4 = 0;
+ post.i5 = 0;
+ post.i6 = 0;
+ post.i7 = 0;
+ post.i8 = 0;
+ post.i9 = 0;
+ post.i10 = 0;
+ post.i11 = 0;
+ post.i12 = 0;
+ post.s1[0] = '\0';
+ parsename[0] = '\0';
+ parsevalue[0] = '\0';
+ parsing = true;
+}
 
 void www_home(WebServer &server, WebServer::ConnectionType type, char *, bool) {
+  resetpost();
   if (type == WebServer::POST)  {
     server.httpSeeOther("PREFIX");
     return;
@@ -215,500 +400,328 @@ void www_home(WebServer &server, WebServer::ConnectionType type, char *, bool) {
     t  = gettimeofday();
     int begin = getsunrise(t);
     int end   = getsunset(t);
-
-    DATA_index index_vars;
-    for(int i=0; i<6; i++) {
-      DATA_ChannelList c;
-      c.name    = names[i];
-      c.operate = operate(i, t);
-      index_vars.Channels[i] = c;
-    }
-
-    if(manual) {
-      index_vars.modus = "Manuell";
-    }
-    else {
-      index_vars.modus = "Automatisch";
-    }
     
-    index_vars.hour   = hour(t);
-    index_vars.minute = minute(t);
-    index_vars.second = second(t);
+    post.i1 = temperature();
+    post.i2 = humidity();
+    
+    post.i3 = day(t);
+    post.i4 = month(t);
+    post.i5 = year(t);
+    
+    post.i6 = hour(t);
+    post.i7 = minute(t);
+    post.i8 = second(t);
 
-    index_vars.day   = day(t);
-    index_vars.month = month(t);
-    index_vars.year  = year(t);
-
-    index_vars.sunrisehour   = (begin - (begin % 60)) / 60;
-    index_vars.sunriseminute = begin % 60;
-    index_vars.sunsethour    = (end - (end % 60)) / 60;
-    index_vars.sunsetminute  = end % 60;
-
-    index_vars.temp     = temperature();
-    index_vars.humidity = humidity();
- 
-    tpl_index(server, index_vars);
+    post.i9  = (begin - (begin % 60)) / 60;
+    post.i10 = begin % 60;
+    post.i11 = (end - (end % 60)) / 60;
+    post.i12 = end % 60;
+    
+    tpl_index(server);
   }
 }
+  
 
 void www_channels(WebServer &server, WebServer::ConnectionType type, char *, bool) {
   if (type == WebServer::POST)  {
     server.httpSeeOther("PREFIX");
     return;
   }
-
   server.httpSuccess();
-
-  if (type == WebServer::GET) {
-    DATA_channels data;
-
-    for(int i=0; i<6; i++) {
-      DATA_ChannelList c;
-      c.name           = names[i];
-      c.id             = i;
-      c.programid      = db.channels[i].program;
-      if(db.programs[db.channels[i].program].type == STATIC) {
-	c.modus = "Statisch";
-      }
-      else {
-	c.modus = "Astronomisch";
-      }
-      data.Channels[i] = c;
-    }
-
-    tpl_channels(server, data);
-  }
+  tpl_channels(server);
 }
 
 void www_setdate(WebServer &server, WebServer::ConnectionType type, char *, bool) {
+  resetpost();
   t  = gettimeofday();
-  DATA_setdate data;
 
   server.httpSuccess();
 
   if (type == WebServer::POST)  {
-    char name[32];
-    char value[32];
-    bool parsing = true;
-
     // initialize them, so that setTime() doesnt get undef's
     // in case the user didn't post them all
-    int tag    = day(t);
-    int monat  = month(t);
-    int jahr   = year(t);
-    int stunde = hour(t);
-    int min    = minute(t);
-    int sekunde= second(t);
-    int dstz;
-
-    if(dst(t)) {
-      dstz = 1;
-    }
-    else {
-      dstz = 0;
-    }
-
+    post.i1 = day(t);
+    post.i2 = month(t);
+    post.i3 = year(t);
+    post.i4 = hour(t);
+    post.i5 = minute(t);
+    post.i6 = second(t);
+    post.i7 = dst(t);
+    
     while (parsing) {
-      parsing = server.readPOSTparam(name, 32, value, 32);
-      if (strcmp(name, "day")    == 0){tag     = atoi(value);}
-      if (strcmp(name, "month")  == 0){monat   = atoi(value);}
-      if (strcmp(name, "year")   == 0){jahr    = atoi(value);}
-      if (strcmp(name, "hour")   == 0){stunde  = atoi(value);}
-      if (strcmp(name, "minute") == 0){min     = atoi(value);}
-      if (strcmp(name, "second") == 0){sekunde = atoi(value);}
-      if (strcmp(name, "dst")    == 0){dstz    = atoi(value);}
+      parsing = server.readPOSTparam(parsename, 32, parsevalue, 32);
+      if (strcmp(parsename, "0")  == 0){post.i1 = atoi(parsevalue); }
+      if (strcmp(parsename, "1")  == 0){post.i2 = atoi(parsevalue); }
+      if (strcmp(parsename, "2")  == 0){post.i3 = atoi(parsevalue); }
+      if (strcmp(parsename, "3")  == 0){post.i4 = atoi(parsevalue); }
+      if (strcmp(parsename, "4")  == 0){post.i5 = atoi(parsevalue); }
+      if (strcmp(parsename, "5")  == 0){post.i6 = atoi(parsevalue); }
+      if (strcmp(parsename, "6")  == 0){post.i7 = atoi(parsevalue); }
     }
-
+    
     // set the time, first run, using raw input
-    setTime(stunde, min, sekunde, tag, monat, jahr);
+    setTime(post.i4, post.i5, post.i6, post.i1, post.i2, post.i3);
+    t = now();
 
-    if(dstz == 1) {
+    if(post.i7 == 1) {
       // user supplied time is within dst, so substract 60 minutes
       // and set the corrected time again, since we run internally
       // ALWAYS within winter time
-      t = gettimeofday();
-      t =- 3600;
-      adjustTime(t);
+      t -= 3600;
     }
 
-    data.message = "Datum und Uhrzeit eingestellt";
+    setTime(t);
+    RTC.set(t);
+    
+    sddone.copy(post.s1); 
   }
 
   t  = gettimeofday();
-  data.hour   = hour(t);
-  data.minute = minute(t);
-  data.second = second(t);
+  post.i1 = day(t);
+  post.i2 = month(t);
+  post.i3 = year(t);
+  post.i4 = hour(t);
+  post.i5 = minute(t);
+  post.i6 = second(t);
+  post.i7 = dst(t);
 
-  data.day   = day(t);
-  data.month = month(t);
-  data.year  = year(t);
-
-  if(dst(t)) {
-    data.dst = 1;
-  }
-  else {
-    data.dst = 0;
-  }
-
-  tpl_setdate(server, data);
+  tpl_setdate(server);
 }
 
 
 void www_setip(WebServer &server, WebServer::ConnectionType type, char *, bool) {
-  DATA_setip data;
-
-  data.octet1 = db.settings.octet1;
-  data.octet2 = db.settings.octet2;
-  data.octet3 = db.settings.octet3;
-  data.octet4 = db.settings.octet4;
-
+  resetpost();
   server.httpSuccess();
-
   if (type == WebServer::POST)  {
-    char name[32];
-    char value[32];
-    bool parsing = true;
-
     while (parsing) {
-      parsing = server.readPOSTparam(name, 32, value, 32);
-      if (strcmp(name, "octet1") == 0){data.octet1 = atoi(value);}
-      if (strcmp(name, "octet2") == 0){data.octet2 = atoi(value);}
-      if (strcmp(name, "octet3") == 0){data.octet3 = atoi(value);}
-      if (strcmp(name, "octet4") == 0){data.octet4 = atoi(value);}
+      parsing = server.readPOSTparam(parsename, 32, parsevalue, 32);
+      if (strcmp(parsename, "0") == 0){post.i1 = atoi(parsevalue);}
+      if (strcmp(parsename, "1") == 0){post.i2 = atoi(parsevalue);}
+      if (strcmp(parsename, "2") == 0){post.i3 = atoi(parsevalue);}
+      if (strcmp(parsename, "3") == 0){post.i4 = atoi(parsevalue);}
     }
 
-    db.settings.octet1 = data.octet1;
-    db.settings.octet2 = data.octet2;
-    db.settings.octet3 = data.octet3;
-    db.settings.octet4 = data.octet4;
-
-    ee_wr_settings(db.settings);
-
-    data.message = "Neue IP Adresse eingestellt";
+    Settings S = db.settings;
+    S.octet1 = post.i1;
+    S.octet2 = post.i2;
+    S.octet3 = post.i3;
+    S.octet4 = post.i4;
+    ee_wr_settings(S);
+    ipdone.copy(post.s1);
     db = ee_getdb();
   }
 
-  tpl_setip(server, data);
+  tpl_setip(server);
 }
 
 
 void www_setprogram(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
-  DATA_setprogram data;
-  DATA_ProgramList P;
-  int channel;
-  int program;
-
+  // 0 = i1 = channel, 1 = i2 = program
+  resetpost();
   server.httpSuccess();
 
   if (type == WebServer::GET)  {
     URLPARAM_RESULT rc;
-    char name[32];
-    char value[32];
     if (strlen(url_tail)) {
       while (strlen(url_tail)) {
-	rc = server.nextURLparam(&url_tail, name, 32, value, 32);
-	if (strcmp(name, "channel") == 0){channel = atoi(value);}
+	rc = server.nextURLparam(&url_tail, parsename, 32, parsevalue, 32);
+	if (strcmp(parsename, "channel") == 0){post.i1 = atoi(parsevalue); Serial << "uri chan: " << post.i1 << endl;}
       }
-      if(channel < 0 || channel > 5) {
-	data.message = "Fehler: Unbekannter Steuerkanal!";
-	tpl_setprogram(server, data);
+      if(post.i1 < 0 || post.i1 > 5) {
+        err_unknchan.copy(post.s1);
+	tpl_setprogram(server);
 	return;
       }
     }
     else {
-      data.message = "Fehler: Channel ID nicht angegeben!";
-      tpl_setprogram(server, data);
+      err_unknid.copy(post.s1);
+      tpl_setprogram(server);
       return;
     }
   }
 
+  // 0 = i1 = channel, 1 = i2 = program
   if (type == WebServer::POST)  {
-    char name[32];
-    char value[32];
-    bool parsing = true;
-
     while (parsing) {
-      parsing = server.readPOSTparam(name, 32, value, 32);
-      if (strcmp(name, "id")      == 0){channel = atoi(value);}
-      if (strcmp(name, "program") == 0){program = atoi(value);}
+      parsing = server.readPOSTparam(parsename, 32, parsevalue, 32);
+      if (strcmp(parsename, "0") == 0){post.i1 = atoi(parsevalue);}
+      if (strcmp(parsename, "1") == 0){post.i2 = atoi(parsevalue);}
     }
 
-    if(program < 0 || program > 31) {
-      data.message = "Fehler: Unbekanntes Programm!";
-      tpl_setprogram(server, data);
+    if(post.i2 < 0 || post.i2 > 31) {
+      err_unknpr.copy(post.s1);
+      tpl_setprogram(server);
       return;
     }
     else {
-      db.channels[channel].program = program;
-      ee_wr_channel(db.channels[channel]);
-      data.message = "Steuerkanal neuem Programm zugeordnet";
+      Serial << "Assigning program " << post.i2 << " to channel " << post.i1 << endl;
+      Channel c = db.channels[post.i1];
+      c.program = post.i2;
+      ee_wr_channel(c);
+      spdone.copy(post.s1);
       db = ee_getdb();
     }
   }
 
-  for (int p=0; p<maxprograms; p++) {
-    P = prog2web(p);
-    if(db.channels[channel].program == p) {
-      P.current = "selected='selected'";
-    }
-    data.Programs[p] = P;
-  }
-
-  tpl_setprogram(server, data);
+  tpl_setprogram(server);
 }
 
 
-void www_programs(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
-  DATA_programs data;
-  DATA_ProgramList P;
 
+void www_programs(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
+  resetpost();
   if (type == WebServer::POST)  {
     server.httpSeeOther("PREFIX");
     return;
   }
-
   server.httpSuccess();
-
   if (type == WebServer::GET)  {
-    for (int p=0; p<maxprograms; p++) {
-      data.Programs[p] = prog2web(p);
-    }
-    tpl_programs(server, data);
+    tpl_programs(server);
   }
 }
 
 
 void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
-  DATA_editprogram data;
-  int program;
-  int bh;
-  int bm;
-  int eh;
-  int em;
-  int bd;
-  int ed;
-  int typ;
-  int cd;
-
+  Serial << "resetpost" << endl;
+  resetpost();
   server.httpSuccess();
-
+  Serial << "success" << endl;
   if (type == WebServer::GET)  {
+    Serial << "get" << endl;
     URLPARAM_RESULT rc;
-    char name[32];
-    char value[32];
     if (strlen(url_tail)) {
       while (strlen(url_tail)) {
-	rc = server.nextURLparam(&url_tail, name, 32, value, 32);
-	if (strcmp(name, "id") == 0){program = atoi(value);}
+	rc = server.nextURLparam(&url_tail, parsename, 32, parsevalue, 32);
+	if (strcmp(parsename, "program") == 0){post.i1 = atoi(parsevalue);}
       }
-      if(program < 0 || program > 31) {
-	data.message = "Fehler: Unbekanntes Programm!";
-	tpl_editprogram(server, data);
+      if(post.i1 < 0 || post.i1 > 31) {
+        err_unknprog.copy(post.s1);
+	tpl_editprogram(server);
 	return;
       }
+      Serial << "got id by get" << endl;
     }
     else {
-      data.message = "Fehler: Program ID nicht angegeben!";
-      tpl_editprogram(server, data);
+      err_unknprogid.copy(post.s1);
+      tpl_editprogram(server);
       return;
     }
-    bh   = db.programs[program].start_hour;
-    bm   = db.programs[program].start_min;
-    eh   = db.programs[program].stop_hour;
-    em   = db.programs[program].stop_min;
-    bd   = db.programs[program].start_delay;
-    ed   = db.programs[program].stop_delay;
-    typ  = db.programs[program].type;
-    cd   = db.programs[program].cooldown;
   }
 
   if (type == WebServer::POST)  {
-    char name[32];
-    char value[32];
-    bool parsing = true;
-
+    Serial << "post" << endl;
+    Serial << "var parsing: " << parsing << endl;
     while (parsing) {
-      parsing = server.readPOSTparam(name, 32, value, 32);
-      if (strcmp(name, "id")        == 0){program = atoi(value);}
-      if (strcmp(name, "starthour") == 0){bh      = atoi(value);}
-      if (strcmp(name, "startmin")  == 0){bm      = atoi(value);}
-      if (strcmp(name, "stophour")  == 0){eh      = atoi(value);}
-      if (strcmp(name, "stopmin")   == 0){em      = atoi(value);}
-      if (strcmp(name, "startdelay")== 0){bd      = atoi(value);}
-      if (strcmp(name, "stopdelay") == 0){ed      = atoi(value);}
-      if (strcmp(name, "type")      == 0){typ     = atoi(value);}
-      if (strcmp(name, "cooldown")  == 0){cd      = atoi(value);}
+      parsing = server.readPOSTparam(parsename, 32, parsevalue, 32);
+      Serial << "POST param: " << parsename << ", value: " << parsevalue << endl;
+      if (strcmp(parsename, "0") == 0){post.i1 = atoi(parsevalue);}
+      if (strcmp(parsename, "1") == 0){post.i2 = atoi(parsevalue);}
+      if (strcmp(parsename, "2") == 0){post.i3 = atoi(parsevalue);}
+      if (strcmp(parsename, "3") == 0){post.i4 = atoi(parsevalue);}
+      if (strcmp(parsename, "4") == 0){post.i5 = atoi(parsevalue);}
+      if (strcmp(parsename, "5") == 0){post.i6 = atoi(parsevalue);}
+      if (strcmp(parsename, "6") == 0){post.i7 = atoi(parsevalue);}
+      if (strcmp(parsename, "7") == 0){post.i8 = atoi(parsevalue);}
+      if (strcmp(parsename, "8") == 0){post.i9 = atoi(parsevalue);}
     }
 
-    int error;
+    int error = 0;
     if(typ < 0 || typ > 1) {
-      data.message = "Fehler: type != 0|1!";
+      err_type.copy(post.s1);
+      editdata.message = "Fehler: type != 0|1!";
       error = 1;
     }
     if(bh < 0 || bh > 23) {
-      data.message = "Fehler: start hour ! 0-23!";
+      err_hour1.copy(post.s1);
       error = 1;
     }
     if(bm < 0 || bm > 59) {
-      data.message = "Fehler: start min ! 0-59!";
+      err_min1.copy(post.s1);
       error = 1;
     }
     if(eh < 0 || eh > 23) {
-      data.message = "Fehler: stop hour ! 0-23!";
+      err_hour2.copy(post.s1);
       error = 1;
     }
     if(em < 0 || em > 59) {
-      data.message = "Fehler: stop min ! 0-59!";
+      err_min2.copy(post.s1);
       error = 1;
     }
     if(bd < 0 || bd > 65536) {
-      data.message = "Fehler: start delay ! 0-65536!";
+      err_delay1.copy(post.s1);
       error = 1;
     }
     if(ed < 0 || ed > 65536) {
-      data.message = "Fehler: start delay ! 0-65536!";
+      err_delay1.copy(post.s1);
       error = 1;
     }
     if(cd < 0 || cd > 65536) {
-      data.message = "Fehler: cooldown ! 0-65536!";
+      err_cooldown.copy(post.s1);
       error = 1;
     }
 
-    if(error) {
-      tpl_editprogram(server, data);
-      return;
-    }
-    else {
-      Program p = db.programs[program];
-      p.start_hour = bh;
-      p.start_min  = bm;
-      p.stop_hour  = eh;
-      p.stop_min   = em;
-      p.start_delay= bd;
-      p.stop_delay = ed;
-      p.type       = typ;
-      p.cooldown   = cd;
+    if(! error) {
+      Program p = db.programs[post.i1];
+      p.type       = post.i2;
+      p.start_hour = post.i3;
+      p.start_min  = post.i4;
+      p.stop_hour  = post.i5;
+      p.stop_min   = post.i6;
+      p.start_delay= post.i7;
+      p.stop_delay = post.i8;
+      p.cooldown   = post.i9;
       ee_wr_program(p);
-      data.message = "Programm wurde gespeichert";
+      progdone.copy(post.s1);
+      delay(10);
+      Serial << "Saved prog " << post.i1 << endl;
       db = ee_getdb();
     }
   }
 
-  data.starthour  = bh;
-  data.startmin   = bm;
-  data.stophour   = eh;
-  data.stopmin    = em;
-  data.startdelay = bd;
-  data.stopdelay  = ed;
-  data.cooldown   = cd;
-  data.Types[0].value = 0;
-  data.Types[0].description = "Astronomisch (Start/Stop Verz&ouml;gerung Einstellen";
-  if (typ == 0) {
-    data.Types[0].current = "selected='selected'";
-  }
-  data.Types[1].value = 1;
-  data.Types[1].description = "Statisch (Start/Stop Stunde/Minute Einstellen)";
-  if (typ == 1) {
-    data.Types[1].current = "selected='selected'";
-  }
-
-  tpl_editprogram(server, data);
+  tpl_editprogram(server);
 }
 
 
 
 void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
-  DATA_air data;
-
-  int isactive;
-  int tmin;
-  int tmax;
-
+  resetpost();
   server.httpSuccess();
 
   if (type == WebServer::POST)  {
-    char name[32];
-    char value[32];
-    bool parsing = true;
-
     while (parsing) {
-      parsing = server.readPOSTparam(name, 32, value, 32);
-      if (strcmp(name, "active")  == 0){isactive = atoi(value);}
-      if (strcmp(name, "tmin")    == 0){tmin     = atoi(value);}
-      if (strcmp(name, "tmax")    == 0){tmax     = atoi(value);}
+      parsing = server.readPOSTparam(parsename, 32, parsevalue, 32);
+      if (strcmp(parsename, "1")  == 0){post.i1 = atoi(parsevalue);}
+      if (strcmp(parsename, "2")  == 0){post.i2 = atoi(parsevalue);}
+      if (strcmp(parsename, "3")  == 0){post.i3 = atoi(parsevalue);}
     }
 
-    if(tmin < 0 || tmin > 65 || tmax < 0 || tmax > 65) {
-      data.message = "Fehler: Temperatur 0-65!";
-      tpl_air(server, data);
+    if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65) {
+      err_air.copy(post.s1);
+      tpl_air(server);
       return;
     }
     else {
       Settings S = db.settings;
-      if(isactive) {
+      if(post.i1) {
 	S.aircondition = true;
       }
       else {
 	S.aircondition = false;
       }
-      S.air_tmin = tmin;
-      S.air_tmax = tmax;
+      S.air_tmin = post.i2;
+      S.air_tmax = post.i3;
       ee_wr_settings(S);
-      data.message = "Klimaeinstellungen gespeichert";
+      airdone.copy(post.s1);
       db = ee_getdb();
     }
   }
-
-  data.tmin = db.settings.air_tmin;
-  data.tmax = db.settings.air_tmax;
-
-  data.Air[0].id = 0;
-  data.Air[0].description = "Aktiv";
-  if(db.settings.aircondition == false) {
-    data.Air[0].current = "selected='selected'";
-  }
-
-  data.Air[1].id = 1;
-  data.Air[1].description = "Inaktiv";
-  if(db.settings.aircondition == true) {
-    data.Air[1].current = "selected='selected'";
-  }
-
-  tpl_air(server, data);
+  tpl_air(server);
 }
-
-
 
 
 /*
  * Helper functions
  */
-
-struct DATA_ProgramList prog2web(int p) {
-  /*
-   * return a human readable version of the
-   * given program as a struct, used by webserver
-   * templates.
-   */
-  DATA_ProgramList P;
-  P.id = p;
-  P.description = "";
-
-  /* FIXME: String concatenation may work incorrectly or crash. Maybe use sprintf() instead */
-  if(db.programs[p].type == STATIC) {
-    P.description += p + ": Statisch, Start: " + db.programs[p].start_hour + ':' + db.programs[p].start_min;
-    P.description += ", Stop: " + db.programs[p].stop_hour + ':' + db.programs[p].stop_min;
-    P.modus = "Statisch";
-  }
-  else {
-    P.description = p + ": Astronomisch, Startverschiebung: ";
-    P.description += db.programs[p].start_delay + " Minuten, Stopverschiebung: ";
-    P.description += db.programs[p].stop_delay + " Minuten";
-    P.modus = "Astronomisch";
-  }
-  return P;
-}
-
 void software_Reset() {
   /*
    * Restarts program from beginning but does not reset the peripherals and registers
@@ -857,15 +870,16 @@ void blink() {
    */
   for(int i=0; i<3; i++) {
     digitalWrite(statusled, HIGH);
-    delay(25);
+    delay(10);
     digitalWrite(statusled, LOW);
-    delay(100);
+    delay(20);
   }
 }
 
 void beep() {
   /* play a C-Dur 4 for 4 milliseconds - a beep */
   tone(speaker, NOTE_C4, 4);
+  noTone(speaker);
 }
 
 
@@ -878,16 +892,20 @@ void check_main(bool init) {
    * is ignored and mainstatus will be initialized.
    */
   pressed = digitalRead(mainswitch);
+ 
   if(pressed != mainstatus || init) {
     if(pressed) {
       manual = false;
       digitalWrite(mainled, HIGH);
     }
     else {
-      manual = false;
+      manual = true;
       digitalWrite(mainled, LOW);
     }
     mainstatus = pressed;
+    check_switches(true);
+    check_timers(true);
+    //Serial << "main - pressed: " << pressed << ", mainstatus: " << mainstatus << ", manual: " << manual << endl;
   }
 }
 
@@ -911,13 +929,13 @@ void check_switches(bool init) {
   }
 
   for(channel=0; channel<6; channel++) {
-    pressed = digitalRead(switches[channel]);
-    if(pressed != state[channel] || init) {
+    swpressed = digitalRead(switches[channel]);
+    if(swpressed != state[channel] || init) {
       if(manual) {
-	if(pressed) {
+	if(swpressed) {
 	  digitalWrite(leds[channel],   HIGH);
 	  if(db.programs[db.channels[channel].program].cooldown) {
-	    if(cooldown[channel] > db.programs[db.channels[channel].program].cooldown) {
+	    if(cooldown[channel] > (db.programs[db.channels[channel].program].cooldown / 60)) {
 	      // ok, it's cooled down enough, switch it
 	      digitalWrite(relays[channel], LOW);
 	      cooldown[channel] = 0;
@@ -941,7 +959,10 @@ void check_switches(bool init) {
       else {
 	digitalWrite(leds[channel],   LOW);
       }
-      state[channel] = pressed;
+      state[channel] = swpressed;
+      //Serial << "checkswitches" << endl;
+      //Serial << "   channel: " << channel << ", pressed: " << swpressed << ", state: " << state[channel];
+      //Serial << ", stmoment: " << stmoment << ", sttimer: " << sttimer << ", man: " << manual << endl;
     }
   }
 
@@ -971,11 +992,13 @@ void check_timers(bool init) {
       t = gettimeofday();
       for(channel=0; channel<6; channel++) {
 	runtime = operate(channel, t);
-	if(runtime != state[channel] || init) {
+        //Serial << "timer - " << channel << ", runtime: " << runtime;
+        //Serial << ", runstate: " << runstate[channel] << endl;
+	if(runtime != runstate[channel] || init) {
 	  if(runtime) {
 	    /* within operation time, turn the channel on */
 	    if(db.programs[db.channels[channel].program].cooldown) {
-	      if(cooldown[channel] > db.programs[db.channels[channel].program].cooldown) {
+	      if(cooldown[channel] > (db.programs[db.channels[channel].program].cooldown / 60)) {
 		// ok, it's cooled down enough, switch it
 		digitalWrite(relays[channel], LOW);
 		cooldown[channel] = 0;
@@ -994,7 +1017,7 @@ void check_timers(bool init) {
 	  else {
 	    digitalWrite(relays[channel], HIGH);
 	  }
-	  state[channel] = runtime;
+	  runstate[channel] = runtime;
 	}
       }
       timer = moment;
@@ -1053,21 +1076,21 @@ void sh_channels() {
    * shows all channel configs with program assignments
    */
   for(int i=0; i<6; i++) {
-    Serial << "Channel #" << i << ": " << names[i] << " config: " << endl;
-    Serial << "        Program: " << db.channels[i].program << endl;
-    Serial << "            Typ: ";
+    Serial << f_shc_cn << i << f_colon << names[i] << f_shc_cfg << endl;
+    Serial << f_shc_pr << db.channels[i].program << endl;
+    Serial << f_shc_typ;
     if(db.programs[db.channels[i].program].type == STATIC) {
-      Serial << "Statisch" << endl;
-      Serial << "          Start: " << db.programs[db.channels[i].program].start_hour << ':' << db.programs[db.channels[i].program].start_min << endl;
-      Serial << "           Stop: " << db.programs[db.channels[i].program].stop_hour << ':' << db.programs[db.channels[i].program].stop_min << endl;
+      Serial << f_shc_st << endl;
+      Serial << f_shc_start << db.programs[db.channels[i].program].start_hour << ':' << db.programs[db.channels[i].program].start_min << endl;
+      Serial << f_shc_stop << db.programs[db.channels[i].program].stop_hour << ':' << db.programs[db.channels[i].program].stop_min << endl;
     }
     else {
-      Serial << "Astronomisch" << endl;
-      Serial << "    Start Delay: " << db.programs[db.channels[i].program].start_delay << " Minuten" << endl;
-      Serial << "     Stop Delay: " << db.programs[db.channels[i].program].stop_delay << " Minuten" << endl;
+      Serial << f_shc_ast << endl;
+      Serial << f_shc_stdel << db.programs[db.channels[i].program].start_delay << f_shc_min << endl;
+      Serial << f_shc_stodel << db.programs[db.channels[i].program].stop_delay << f_shc_min << endl;
     }
     if(db.programs[db.channels[i].program].cooldown > 0) {
-      Serial << "Einschalt Verzoegerung: " << db.programs[db.channels[i].program].cooldown << " Sekunden" << endl;
+      Serial << f_shc_delay << db.programs[db.channels[i].program].cooldown << f_shc_min << endl;
     }
   }
 }
@@ -1077,19 +1100,19 @@ void sh_programs() {
    * show all saved programs in EEPROM
    */
   for(int p=0; p<maxprograms; p++) {
-    Serial << "Program #" << p << endl;
+    Serial << f_shc_pn << p << endl << f_shc_typ;
     if(db.programs[p].type == STATIC) {
-       Serial << "        Typ: Statisch" << endl;
-       Serial << "          Start: " << db.programs[p].start_hour << ':' << db.programs[p].start_min << endl;
-       Serial << "           Stop: " << db.programs[p].stop_hour << ':' << db.programs[p].stop_min << endl;
+       Serial << f_shc_st << endl;
+       Serial << f_shc_start << db.programs[p].start_hour << ':' << db.programs[p].start_min << endl;
+       Serial << f_shc_stop << db.programs[p].stop_hour << ':' << db.programs[p].stop_min << endl;
     }
     else {
-      Serial << "        Typ: Astronomisch" << endl;
-      Serial << "    Start Delay: " << db.programs[p].start_delay << " Minuten" << endl;
-      Serial << "     Stop Delay: " << db.programs[p].stop_delay << " Minuten" << endl;
+      Serial << f_shc_ast << endl;
+      Serial << f_shc_stdel << db.programs[p].start_delay << f_shc_min << endl;
+      Serial << f_shc_stodel << db.programs[p].stop_delay << f_shc_min << endl;
     }
     if(db.programs[p].cooldown > 0) {
-      Serial << "Einschalt Verzoegerung: " << db.programs[p].cooldown << " Sekunden" << endl;
+      Serial << f_shc_delay << db.programs[p].cooldown << f_shc_sec << endl;
     }
   }
 }
@@ -1121,24 +1144,24 @@ void sh_air(char parameter[MAXBYTES]) {
       else {
 	// no digit, no dot = fail!
 	beep();
-	Serial << "Error: invalid temperature entered, unallowed char: " << parameter[i] << '!' << endl;
+	Serial << f_sherr_char << parameter[i] << '!' << endl;
 	return;
       }
     }
     if(nvalue != 1) {
       beep();
-      Serial << "Error: invalid temperatures entered! Enter 2 digits separated by space (0-65 *C)" << endl;
+      Serial << f_sherr_form <<  f_sherr_extmp << endl;
       return;
     }
     else {
       if(value[0] < 0 || value[0] > 65) {
 	beep();
-	Serial << "Error: invalid Tmin entered, Tmin " << value[0] << " not within 0-65!" << endl;
+        Serial << f_sherr_form << f_sherr_exstmp << endl;
 	return;
       }
       if(value[1] < 0 || value[1] > 65) {
 	beep();
-	Serial << "Error: invalid Tmax entered, Tmax " << value[1] << " not within 0-65!" << endl;
+        Serial << f_sherr_form << f_sherr_exstmp << endl;
 	return;
       }
 
@@ -1149,8 +1172,7 @@ void sh_air(char parameter[MAXBYTES]) {
       S.air_tmax     = value[1];
       ee_wr_settings(S);
       db = ee_getdb();
-
-      Serial << "Air condition successfully set to Tmin:" << value[0] << ", Tmax: " << value[1] << endl;
+      Serial << f_sht_tmpsav << value[0] << '-' << value[1] << endl;
       return;
     }
   }
@@ -1161,7 +1183,7 @@ void sh_air(char parameter[MAXBYTES]) {
     ee_wr_settings(S);
     db = ee_getdb();
 
-    Serial << "Air condition successfully turned OFF" << endl;
+    Serial << f_sht_airoff << endl;
     return;
   }
 }
@@ -1171,16 +1193,12 @@ void sh_ip(char parameter[MAXBYTES]) {
   /*
    * sets the ip address based on user serial input
    */
-  Serial << "Current IP Address: ";
-  Serial << db.settings.octet1 << '.' << db.settings.octet2 << '.' << db.settings.octet3 << '.' << db.settings.octet4 << endl;
   if(parameter[0] != '\0') {
     // ip given, parse it
-    int octet[4];
-    int noctet;
-    char buffer[4];
-    byte idx = 0;
+    nvalue = 0;
+    idx    = 0;
     for(int i=0; parameter[i]; i++) {
-      if(parameter[i] > '0' || parameter[i] < '9') {
+      if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
 	buffer[idx] = parameter[i];
 	idx++;
@@ -1188,8 +1206,8 @@ void sh_ip(char parameter[MAXBYTES]) {
       }
       else if(parameter[i] == '.') {
 	// one octet done
-	octet[noctet] = atoi(buffer);
-	noctet++;
+	value[nvalue] = atoi(buffer);
+	nvalue++;
 	idx = 0;
 	buffer[0] = '\0';
       }
@@ -1200,14 +1218,21 @@ void sh_ip(char parameter[MAXBYTES]) {
 	return;
       }
     }
-    if(noctet != 3) {
+    if(buffer[0] != '\0') {
+      value[nvalue] = atoi(buffer);
+      nvalue++;
+      idx = 0;
+      buffer[0] = '\0';
+    }
+    
+    if(nvalue != 4) {
       beep();
       Serial << f_sherr_form << f_sherr_exip << endl;
       return;
     }
     else {
       for(int i=0; i<4; i++) {
-	if(octet[i] < 0 || octet[i] > 255) {
+	if(value[i] < 0 || value[i] > 255) {
 	  beep();
           Serial << f_sherr_form << f_sherr_exoct << endl;
 	  return;
@@ -1215,19 +1240,23 @@ void sh_ip(char parameter[MAXBYTES]) {
       }
       // if we have done it until here, put the octets into eeprom
       Settings S = db.settings;
-      S.octet1 = octet[0];
-      S.octet2 = octet[1];
-      S.octet3 = octet[2];
-      S.octet4 = octet[3];
+      S.octet1 = value[0];
+      S.octet2 = value[1];
+      S.octet3 = value[2];
+      S.octet4 = value[3];
       ee_wr_settings(S);
       db = ee_getdb();
       // FIXME: maybe doesn't work this way, eventually reboot instead, check this!
       uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
       Ethernet.begin(mac, ip);
-      Serial << f_sht_ipsav << octet[0] << '.' << octet[1] << '.' << octet[2] << '.' << octet[3] << endl;
+      Serial << f_sht_ipsav << value[0] << '.' << value[1] << '.' << value[2] << '.' << value[3] << endl;
       
       return;
     }
+  }
+  else {
+    Serial << f_ship << db.settings.octet1 << '.' << db.settings.octet2 << '.';
+    Serial << db.settings.octet3 << '.' << db.settings.octet4 << endl;
   }
 }
 
@@ -1237,12 +1266,10 @@ void sh_setdate(char parameter[MAXBYTES]) {
    */
   if(parameter[0] != '\0') {
     // date given, parse it
-    int value[3];
-    int nvalue;
-    char buffer[2];
-    byte idx = 0;
+    nvalue = 0;
+    idx = 0;
     for(int i=0; parameter[i]; i++) {
-      if(parameter[i] > '0' || parameter[i] < '9') {
+      if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
 	buffer[idx] = parameter[i];
 	idx++;
@@ -1261,8 +1288,16 @@ void sh_setdate(char parameter[MAXBYTES]) {
 	Serial << f_sherr_char << parameter[i] << endl;
 	return;
       }
+     }
+    
+   if(buffer[0] != '\0') {
+        value[nvalue] = atoi(buffer);
+        nvalue++;
+        idx = 0;
+        buffer[0] = '\0';
     }
-    if(nvalue != 2) {
+
+    if(nvalue != 3) {
       beep();
       Serial << f_sherr_form << f_sherr_ex3digdot << endl;
       return;
@@ -1285,11 +1320,10 @@ void sh_setdate(char parameter[MAXBYTES]) {
       }
 
       // if we have done it until here, change the date
-      t  = gettimeofday();
-      int stunde = hour(t);
-      int min    = minute(t);
-      int sekunde= second(t);
-      setTime(stunde, min, sekunde, value[0], value[1], value[2]);
+      t = now();
+      setTime(hour(t), minute(t), second(t), value[0], value[1], value[2]);
+      t = now();
+      RTC.set(t);
 
       Serial << f_sht_datesav << value[0] << '.' << value[1] << '.' << value[2] << endl;
       return;
@@ -1307,12 +1341,10 @@ void sh_settime(char parameter[MAXBYTES]) {
    */
   if(parameter[0] != '\0') {
     // time given, parse it
-    int value[3];
-    int nvalue;
-    char buffer[2];
-    byte idx = 0;
+
+    
     for(int i=0; parameter[i]; i++) {
-      if(parameter[i] > '0' || parameter[i] < '9') {
+      if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
 	buffer[idx] = parameter[i];
 	idx++;
@@ -1332,9 +1364,17 @@ void sh_settime(char parameter[MAXBYTES]) {
 	return;
       }
     }
-    if(nvalue != 2) {
+    
+    if(buffer[0] != '\0') {
+       value[nvalue] = atoi(buffer);
+	nvalue++;
+	idx = 0;
+	buffer[0] = '\0';
+    }
+      
+    if(nvalue != 3) {
       beep();
-      Serial << f_sherr_form << f_sherr_ex3dig << endl;
+      Serial << f_sherr_form << f_sherr_ex3dig <<  nvalue << endl;
       return;
     }
     else {
@@ -1360,8 +1400,10 @@ void sh_settime(char parameter[MAXBYTES]) {
       int monat  = month(t);
       int jahr   = year(t);
       setTime(value[0], value[1], value[2], tag, monat, jahr);
-
-      Serial << f_sht_timesav<< value[0] << '.' << value[1] << '.' << value[2] << endl;
+      t = now();
+      RTC.set(t);
+      
+      Serial << f_sht_timesav<< value[0] << ':' << value[1] << ':' << value[2] << endl;
       return;
     }
   }
@@ -1369,6 +1411,17 @@ void sh_settime(char parameter[MAXBYTES]) {
     beep();
     Serial << f_sherr_hhmmmis << endl;
   }
+}
+
+#define PINON  'X'
+#define PINOFF '-'
+char displaypin(int pin) {
+  if(pin) {
+    return PINON;
+  }
+  else {
+    return PINOFF;
+  } 
 }
 
 void sh_pins() {
@@ -1385,16 +1438,23 @@ void sh_pins() {
   }
   Serial << endl;
   Serial << f_shp_line << endl;
-  Serial << f_shp_mode << manual << f_shp_2sp;
+  Serial << f_shp_mode << displaypin(digitalRead(mainswitch)) << f_shp_2sp;
   for (int i=0; i<6; i++) {
-    Serial << f_shp_pipe << state[i] << f_shp_2sp;
+    Serial << f_shp_pipe1 << displaypin(state[i]) << f_shp_2sp;
   }
   Serial << endl;
   Serial << f_shp_line << endl;
   Serial << f_shp_rel;
   for (int i=0; i<6; i++) {
     int ops = operate(i, t);
-    Serial << f_shp_pipe << ops << f_shp_2sp;
+    Serial << f_shp_pipe1;
+    if(manual) {
+      Serial << displaypin(state[i]); 
+    }
+    else {
+      Serial << displaypin(ops);
+    }
+    Serial << f_shp_2sp;
   }
   Serial << endl << endl;
 }
@@ -1437,6 +1497,9 @@ void check_command(int command, char parameter[MAXBYTES]) {
   else if(command == 'a') {
     sh_air(parameter);
   }
+  else if(command == 'm') {
+    Serial << f_mem <<  freeMemory() << endl;
+  }
   else if(command == 'h' || command == '?') {
     Serial << f_sh_help;
   }
@@ -1465,6 +1528,7 @@ void check_shell() {
       parameter[0] = '\0';
       command      = '\0';
       parametermode= false;
+      Serial << f_prompt;
     }
     else if(onebyte == ' ') {
       parametermode = true;
@@ -1524,6 +1588,7 @@ void check_air(bool init) {
 
 
 void setup() {
+  beep();
   pinMode(statusled,  OUTPUT);
 
   blink();
@@ -1558,7 +1623,7 @@ void setup() {
 
   blink();
   Serial << "init speaker and air" << endl;
-  pinMode(speaker,    OUTPUT); 
+  //pinMode(speaker,    OUTPUT); 
   pinMode(air,        OUTPUT);
   check_air(INIT);
 
@@ -1576,10 +1641,8 @@ void setup() {
     pinMode(leds[i],     OUTPUT);
     pinMode(relays[i],   OUTPUT);
   }
-  Serial << "   - flags ";
-  check_switches(INIT);
-  Serial << "done" << endl;
-
+  Serial << endl;
+  
   blink();
   Serial << "init timers" << endl;
   check_timers(INIT);
@@ -1597,20 +1660,23 @@ void setup() {
   webserver.addCommand("setprogram.html", &www_setprogram);
   webserver.addCommand("programs.html",   &www_programs);
   webserver.addCommand("editprogram.html",&www_editprogram);
+  webserver.addCommand("air.html",        &www_air);
   webserver.begin();
+
 
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
   beep();
-  Serial << "freeMemory: " <<  freeMemory() << endl;
+  Serial << f_mem <<  freeMemory() << endl;
+  Serial << f_prompt;
 }
 
 
 void loop() {
+  check_main(RUN);
   check_switches(RUN);
   check_timers(RUN);
   check_air(RUN);
   check_shell();
   webserver.processConnection();
-   //Serial << "freeMemory: " <<  freeMemory() << endl;
 }
