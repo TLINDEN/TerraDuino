@@ -69,7 +69,7 @@ long timer;
 long moment;
 long sttimer;
 long stmoment;
-long airtimerinterval = 7200; // 10 min
+long airtimerinterval = 500; // 72000; // 10 min
 long airtimer;
 long airmoment;
 bool airon;
@@ -256,9 +256,32 @@ void tpl_index(WebServer &server) {
       server << ':';
       server << N(end % 60); // stop hour
     }
+    if(db.programs[db.channels[i].program].type != MANUAL) {
+      if( db.programs[db.channels[i].program].cooldown > 0 ) {
+        server << f_shc_delay << db.programs[db.channels[i].program].cooldown << f_shc_min;
+      }
+    }
     server << chlinke << tde << tre;
   }
-  server << tablee << tde << tre << tablee << hfoot;
+  server << tablee << tde << tre;
+ 
+  server << tra << tdr << iklim << tde << td;
+  if(db.settings.aircondition) {
+    server << airactive;
+    server << bis;
+    if(airon) {
+      server << irun;
+    }
+    else {
+      server << ioff;
+    }
+    server << '(' << db.settings.air_tmin << igrad << bis << db.settings.air_tmax << igrad << ')';
+  }
+  else {
+    server << airinactive;
+  }
+  server << tde << tre;
+  server << tablee << hfoot;
 }
 
 void tpl_channels(WebServer &server) {
@@ -407,13 +430,13 @@ void tpl_setair(WebServer &server) {
 
   server << spsel;
 
-  server << opt << 0;
+  server << opt << 0 << '"';
   if(db.settings.aircondition == 0) {
     server << selected;
   }
   server << '>' << airinactive << opte;
 
-  server << opt << 1;
+  server << opt << 1 << '"';
   if(db.settings.aircondition == 1) {
     server << selected;
   }
@@ -1064,19 +1087,31 @@ void check_timers(bool init) {
         if(db.programs[db.channels[channel].program].type == MANUAL) {
           break; 
         }
+        
 	runtime = operate(channel, t);
-        if(runtime) {
-          // remember how long the channel is already running
-          if(db.programs[db.channels[channel].program].cooldown > 0) {
-            if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
-              cooldown[channel] += (moment - timer);
+        
+        if(db.programs[db.channels[channel].program].cooldown > 0) {
+          // program has cooldown time configured
+          if(runtime) {
+            // proposed runtime
+            if((cooldown[channel] / 1000) - 1 > (db.programs[db.channels[channel].program].cooldown * 60)) {
+              // was long enohg off, don't wait anymore, turn it on
+              runstate[channel] = 0;
             }
             else {
-              // reached cooldowntime, init artificially
-              runstate[channel] = 0;
+              // wait more, time not elapsed yet
+              cooldown[channel] += (moment - timer);
+            }
+          }
+          else {
+            // shall be off
+            if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
+              // still time left, add to cooldown more
+              cooldown[channel] += (moment - timer);
             }
           }
         }
+ 
 	if(runtime != runstate[channel] || init) {
 	  if(runtime) {
 	    /* within operation time, turn the channel on */
@@ -1651,7 +1686,7 @@ void check_air(bool init) {
     }
 
     if(init || airmoment - airtimer > airtimerinterval) {
-      int T = (int)temperature;
+      float T = temperature();
       if(T > db.settings.air_tmax) {
 	// turn air condition on
 	digitalWrite(air, LOW);
