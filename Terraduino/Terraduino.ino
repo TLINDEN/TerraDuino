@@ -128,6 +128,33 @@ struct POST {
 
 
 
+/*
+ * We are not using the internal tone()
+ * function because it just doesn't work in my setup,
+ * for whatever strange reasons.
+ *
+ * Code taken from: https://github.com/rynet/Arduino-Tone-Library/blob/master/toneLibrary.pde
+ */
+#define NOTE_A 1136
+#define NOTE_B 1014
+#define NOTE_C 1915
+#define NOTE_D 1700
+#define NOTE_E 1519
+#define NOTE_F 1432
+#define NOTE_G 1275
+
+void playTone(int tone, int duration) {
+  for (long i = 0; i < duration * 1000L; i += tone * 2) {
+    digitalWrite(speaker, HIGH);
+    delayMicroseconds(tone);
+    digitalWrite(speaker, LOW);
+    delayMicroseconds(tone);
+  }
+}
+
+/***********************************/
+
+
 
 /*
  * Webserver output functions
@@ -867,9 +894,8 @@ void blink() {
 }
 
 void beep() {
-  /* play a C-Dur 4 for 4 milliseconds - a beep */
-  tone(speaker, NOTE_C4, 4);
-  noTone(speaker);
+  /* play a C-Dur 4 for 300 milliseconds - a beep */
+  playTone(NOTE_C, 300);
 }
 
 
@@ -1626,7 +1652,7 @@ void setup() {
 
   blink();
   Serial << "init speaker and air" << endl;
-  //pinMode(speaker,    OUTPUT); 
+  pinMode(speaker,    OUTPUT); 
   pinMode(air,        OUTPUT);
   digitalWrite(air, HIGH);
   delay(5);
@@ -1672,6 +1698,7 @@ void setup() {
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
   beep();
+  //playNote(notes[0], beats[0] * tempo);
   Serial << f_mem <<  freeMemory() << endl;
   Serial << f_prompt;
 }
