@@ -36,12 +36,23 @@
 /* defines */
 #define SUNRISE 0
 #define STATIC  1
+#define MANUAL  2
 #define DHTPIN 25
 #define DHTTYPE DHT22 
 #define NOTE_C4  262
 #define WEBDUINO_FAIL_MESSAGE "<h1>Request Failed</h1>"
 #define PREFIX ""
 #define MAXBYTES 64
+#define NOTE_A 1136
+#define NOTE_B 1014
+#define NOTE_C 1915
+#define NOTE_D 1700
+#define NOTE_E 1519
+#define NOTE_F 1432
+#define NOTE_G 1275
+#define PINON  'X'
+#define PINOFF '-'
+
 
 /* global vars */
 time_t t;
@@ -67,6 +78,8 @@ bool INIT = true;
 bool RUN  = false;
 uint8_t runtime;
 long cooldown[] = {0, 0, 0, 0, 0, 0};
+int begin = 0;
+int end = 0;
 
 // serial parser vars
 int     value[4];
@@ -135,14 +148,6 @@ struct POST {
  *
  * Code taken from: https://github.com/rynet/Arduino-Tone-Library/blob/master/toneLibrary.pde
  */
-#define NOTE_A 1136
-#define NOTE_B 1014
-#define NOTE_C 1915
-#define NOTE_D 1700
-#define NOTE_E 1519
-#define NOTE_F 1432
-#define NOTE_G 1275
-
 void playTone(int tone, int duration) {
   for (long i = 0; i < duration * 1000L; i += tone * 2) {
     digitalWrite(speaker, HIGH);
@@ -165,11 +170,14 @@ void prog2web(int p, WebServer &server) {
   
   server << f_shc_pn << p << ' ';
   
-  if(db.programs[p].type == 1) {
+  if(db.programs[p].type == STATIC) {
     server << f_shc_st << f_shc_start;
-    server<< db.programs[p].start_hour << ':' << db.programs[p].start_min;
+    server << N(db.programs[p].start_hour) << ':' << N(db.programs[p].start_min);
     server << bis << f_shc_stop;
-    server << db.programs[p].stop_hour << ':' << db.programs[p].stop_min;
+    server << N(db.programs[p].stop_hour)  << ':' << N(db.programs[p].stop_min);
+  }
+  else if(db.programs[p].type == MANUAL) {
+    server << f_shc_man;
   }
   else {
     server << f_shc_ast << f_shc_stdel << db.programs[p].start_delay << f_shc_min;
@@ -187,8 +195,8 @@ void tpl_index(WebServer &server) {
   server << table;
   server << tra << tdr << itemp << tde << td << post.i1 << igrad << tde << tre;
   server << tra << tdr << ihum  << tde << td << post.i2 << iperc << tde << tre;
-  server << tra << tdr << itime << tde << td << post.i3 << '.' << post.i4 << '.' << post.i5;
-  server << ' ' << post.i6 << ':' << post.i7 << ':' << post.i8 << tde << tre;
+  server << tra << tdr << itime << tde << td << N(post.i3) << '.' << N(post.i4) << '.' << post.i5;
+  server << ' ' << N(post.i6) << ':' << N(post.i7) << ':' << N(post.i8) << tde << tre;
   
   server << tra << tdr << imode << tde << td ;
   if(manual) {
@@ -199,13 +207,18 @@ void tpl_index(WebServer &server) {
   }
   server << tde << tre;
 
-  server << tra << tdr << isunr << tde << td << post.i9 << ':' << post.i10 << tde << tre;
-  server << tra << tdr << isuns << tde << td  << post.i11 << ':' << post.i12 << tde << tre;
+  server << tra << tdr << isunr << tde << td << N(post.i9)  << ':' << N(post.i10) << tde << tre;
+  server << tra << tdr << isuns << tde << td << N(post.i11) << ':' << N(post.i12) << tde << tre;
   
   server << tra << tdrt << ichan << tde << td;
+  t = gettimeofday();
+  begin = getsunrise(t);
+  delay(1);
+  end   = getsunset(t);
+  server << tablesm;
   for (uint8_t i=0; i<6; i++) {
-    server << names[i] << ':';
-    if(manual) {
+    server << tra << td << chlinkl << i << chlinkr << names[i] << chlinke << ':' << tde << td;
+    if(manual || db.programs[db.channels[i].program].type == MANUAL) {
       if(state[i] == HIGH) {
         server << irun;
       }
@@ -221,9 +234,31 @@ void tpl_index(WebServer &server) {
         server << ioff;
       }
     }
-    server << br;
+    server << tde << td;
+    server << prlinkl << db.channels[i].program << chlinkr;
+    if(db.programs[db.channels[i].program].type == MANUAL) {
+      server << f_shc_man; 
+    }
+    else if(db.programs[db.channels[i].program].type == STATIC) {
+      server << f_shc_st << ' ' << N(db.programs[db.channels[i].program].start_hour) << ':' << N(db.programs[db.channels[i].program].start_min);
+      server << bis << N(db.programs[db.channels[i].program].stop_hour) << ':' << N(db.programs[db.channels[i].program].stop_min);
+    }
+    else {
+      server << f_shc_ast << ' ';
+      begin += db.programs[db.channels[i].program].start_delay;
+      end   -= db.programs[db.channels[i].program].stop_delay;
+      //          N((begin - (begin % 60)) / 60);
+      server << N((begin - (begin % 60)) / 60); // start hour
+      server << ':';
+      server << N(begin % 60); // stop hour
+      server << bis;
+      server << N((end - (end % 60)) / 60); // start hour
+      server << ':';
+      server << N(end % 60); // stop hour
+    }
+    server << chlinke << tde << tre;
   }
-  server << tde << tre << tablee << hfoot;
+  server << tablee << tde << tre << tablee << hfoot;
 }
 
 void tpl_channels(WebServer &server) {
@@ -247,12 +282,12 @@ void tpl_setdate(WebServer &server) {
 
   server << tra;
 
-  server << sdfi2 << 0 << sdfv << post.i1 << sdfe << tde;
-  server << sdfi2 << 1 << sdfv << post.i2 << sdfe << tde;
-  server << sdfi4 << 2 << sdfv << post.i3 << sdfe << tde;
-  server << sdfi2 << 3 << sdfv << post.i4 << sdfe << tde;
-  server << sdfi2 << 4 << sdfv << post.i5 << sdfe << tde;
-  server << sdfi2 << 5 << sdfv << post.i6 << sdfe << tde;
+  server << sdfi2 << 0 << sdfv << N(post.i1) << sdfe << tde;
+  server << sdfi2 << 1 << sdfv << N(post.i2) << sdfe << tde;
+  server << sdfi4 << 2 << sdfv << post.i3    << sdfe << tde;
+  server << sdfi2 << 3 << sdfv << N(post.i4) << sdfe << tde;
+  server << sdfi2 << 4 << sdfv << N(post.i5) << sdfe << tde;
+  server << sdfi2 << 5 << sdfv << N(post.i6) << sdfe << tde;
 
   server << tre << tra;
 
@@ -305,7 +340,7 @@ void tpl_editprogram(WebServer &server) {
   server << tableprogset;
   server << spsel;
 
-  for (int i=0; i<2; i++) {
+  for (int i=0; i<3; i++) {
     server << opt << i << '"';
     if(db.programs[post.i1].type == i) {
       server << selected;
@@ -313,6 +348,9 @@ void tpl_editprogram(WebServer &server) {
     server << '>';
     if(i == STATIC) {
       server << f_shc_st;
+    }
+    else if(i == MANUAL) {
+      server << f_shc_man;
     }
     else {
       server << f_shc_ast;
@@ -323,14 +361,14 @@ void tpl_editprogram(WebServer &server) {
 
   // start 1:hour.i2 2:minute.i3
   server << tra << tdr << f_shc_start << tde << td;
-  server << spf2 << 2 << sdfv << db.programs[post.i1].start_hour << sdfe << ':';
-  server << spf2 << 3 << sdfv << db.programs[post.i1].start_min << sdfe;
+  server << spf2 << 2 << sdfv << N(db.programs[post.i1].start_hour) << sdfe << ':';
+  server << spf2 << 3 << sdfv << N(db.programs[post.i1].start_min)  << sdfe;
   server << tde << tre;
 
   // stop 3:hour.i4 4:minute.i5
   server << tra << tdr << f_shc_stop << tde << td;
-  server << spf2 << 4 << sdfv << db.programs[post.i1].stop_hour << sdfe << ':';
-  server << spf2 << 5 << sdfv << db.programs[post.i1].stop_min << sdfe;
+  server << spf2 << 4 << sdfv << N(db.programs[post.i1].stop_hour) << sdfe << ':';
+  server << spf2 << 5 << sdfv << N(db.programs[post.i1].stop_min)  << sdfe;
   server << tde << tre;
 
   // startdelay 5:startdelay.i6
@@ -645,7 +683,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
     }
 
     int error = 0;
-    if(post.i2 < 0 || post.i2 > 1) {
+    if(post.i2 < 0 || post.i2 > 2) {
       err_type.copy(post.s1);
       error = 1;
     }
@@ -808,6 +846,13 @@ int getsunset(time_t t) {
   return s;
 }
 
+char digits[3];
+char* N(int number) {
+   /* return a null if the given number is einstellig */
+   sprintf(digits, "%02d", number);
+   return digits;
+}
+
 int operate(int channel, time_t t) {
   /*
    * check if given channel has to be turned on
@@ -946,7 +991,7 @@ void check_switches(bool init) {
 
   for(channel=0; channel<6; channel++) {
     swpressed = digitalRead(switches[channel]);
-    if(swpressed && manual) {
+    if(swpressed && (manual || db.programs[db.channels[channel].program].type == MANUAL)) {
       // remember how long the channel is already running
       if(db.programs[db.channels[channel].program].cooldown > 0) {
         if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
@@ -962,7 +1007,7 @@ void check_switches(bool init) {
        }
     }
     if(swpressed != state[channel] || init) {
-      if(manual) {
+      if(manual || db.programs[db.channels[channel].program].type == MANUAL) {
 	if(swpressed) {
 	  digitalWrite(leds[channel],   HIGH);
 	  if(db.programs[db.channels[channel].program].cooldown) {
@@ -1016,6 +1061,9 @@ void check_timers(bool init) {
     if(init || moment - timer > timerintervall) {
       t = gettimeofday();
       for(channel=0; channel<6; channel++) {
+        if(db.programs[db.channels[channel].program].type == MANUAL) {
+          break; 
+        }
 	runtime = operate(channel, t);
         if(runtime) {
           // remember how long the channel is already running
@@ -1071,7 +1119,7 @@ void sh_temphumidate() {
 
   Serial << f_sht_temp << T << f_grad << endl;
   Serial << f_sht_hum << h << f_percent << endl;
-  Serial << hour(t) << ':' << minute(t) << ':' << second(t) << ' ' << day(t) << '.' << month(t) << '.' << year(t) << endl;
+  Serial << N(hour(t)) << ':' << N(minute(t)) << ':' << N(second(t)) << ' ' << N(day(t)) << '.' << N(month(t)) << '.' << year(t) << endl;
 
   Serial << f_sht_aircond;
   if(db.settings.aircondition) {
@@ -1096,8 +1144,8 @@ void sh_temphumidate() {
     Serial << f_sht_win << endl;
   }
 
-  Serial << f_sht_sunr << sunrisehour << ':' << sunriseminute << endl;
-  Serial << f_sht_suns << sunsethour << ':' << sunsetminute << endl;
+  Serial << f_sht_sunr << N(sunrisehour) << ':' << N(sunriseminute) << endl;
+  Serial << f_sht_suns << N(sunsethour)  << ':' << N(sunsetminute)  << endl;
 }
 
 void sh_channels() {
@@ -1110,13 +1158,16 @@ void sh_channels() {
     Serial << f_shc_typ;
     if(db.programs[db.channels[i].program].type == STATIC) {
       Serial << f_shc_st << endl;
-      Serial << f_shc_start << db.programs[db.channels[i].program].start_hour << ':' << db.programs[db.channels[i].program].start_min << endl;
-      Serial << f_shc_stop << db.programs[db.channels[i].program].stop_hour << ':' << db.programs[db.channels[i].program].stop_min << endl;
+      Serial << f_shc_start << N(db.programs[db.channels[i].program].start_hour) << ':' << N(db.programs[db.channels[i].program].start_min) << endl;
+      Serial << f_shc_stop  << N(db.programs[db.channels[i].program].stop_hour)  << ':' << N(db.programs[db.channels[i].program].stop_min)  << endl;
+    }
+    else if(db.programs[db.channels[i].program].type == MANUAL) {
+      Serial << f_shc_man << endl;
     }
     else {
       Serial << f_shc_ast << endl;
-      Serial << f_shc_stdel << db.programs[db.channels[i].program].start_delay << f_shc_min << endl;
-      Serial << f_shc_stodel << db.programs[db.channels[i].program].stop_delay << f_shc_min << endl;
+      Serial << f_shc_stdel  << db.programs[db.channels[i].program].start_delay << f_shc_min << endl;
+      Serial << f_shc_stodel << db.programs[db.channels[i].program].stop_delay  << f_shc_min << endl;
     }
     if(db.programs[db.channels[i].program].cooldown > 0) {
       Serial << f_shc_delay << db.programs[db.channels[i].program].cooldown << f_shc_min << endl;
@@ -1132,13 +1183,16 @@ void sh_programs() {
     Serial << f_shc_pn << p << endl << f_shc_typ;
     if(db.programs[p].type == STATIC) {
        Serial << f_shc_st << endl;
-       Serial << f_shc_start << db.programs[p].start_hour << ':' << db.programs[p].start_min << endl;
-       Serial << f_shc_stop << db.programs[p].stop_hour << ':' << db.programs[p].stop_min << endl;
+       Serial << f_shc_start << N(db.programs[p].start_hour) << ':' << N(db.programs[p].start_min) << endl;
+       Serial << f_shc_stop  << N(db.programs[p].stop_hour)  << ':' << N(db.programs[p].stop_min)  << endl;
+    }
+    else if(db.programs[p].type == MANUAL) {
+      Serial << f_shc_man << endl;
     }
     else {
       Serial << f_shc_ast << endl;
-      Serial << f_shc_stdel << db.programs[p].start_delay << f_shc_min << endl;
-      Serial << f_shc_stodel << db.programs[p].stop_delay << f_shc_min << endl;
+      Serial << f_shc_stdel  << db.programs[p].start_delay << f_shc_min << endl;
+      Serial << f_shc_stodel << db.programs[p].stop_delay  << f_shc_min << endl;
     }
     if(db.programs[p].cooldown > 0) {
       Serial << f_shc_delay << db.programs[p].cooldown << f_shc_sec << endl;
@@ -1354,7 +1408,7 @@ void sh_setdate(char parameter[MAXBYTES]) {
       t = now();
       RTC.set(t);
 
-      Serial << f_sht_datesav << value[0] << '.' << value[1] << '.' << value[2] << endl;
+      Serial << f_sht_datesav << N(value[0]) << '.' << N(value[1]) << '.' << value[2] << endl;
       return;
     }
   }
@@ -1432,7 +1486,7 @@ void sh_settime(char parameter[MAXBYTES]) {
       t = now();
       RTC.set(t);
       
-      Serial << f_sht_timesav<< value[0] << ':' << value[1] << ':' << value[2] << endl;
+      Serial << f_sht_timesav<< N(value[0]) << ':' << N(value[1]) << ':' << N(value[2]) << endl;
       return;
     }
   }
@@ -1442,8 +1496,7 @@ void sh_settime(char parameter[MAXBYTES]) {
   }
 }
 
-#define PINON  'X'
-#define PINOFF '-'
+
 char displaypin(int pin) {
   if(pin) {
     return PINON;
