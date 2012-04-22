@@ -62,9 +62,9 @@ struct Program {
   int stop_hour;       // manual stop, HH
   int stop_min;        // manual stop, MM
   int cooldown;
-  int res2;
-  int res3;
-  int res4;
+  int sleep_day;
+  int sleep_mon;
+  int sleep_increment;
 };
 
 struct Database {

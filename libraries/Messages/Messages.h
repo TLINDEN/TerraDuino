@@ -281,6 +281,9 @@ FLASH_STRING(spf5,
 
 FLASH_STRING(spcooldown, "Einschalt Verz&ouml;gerung (Cooldown Zeit) (Minuten)");
 
+FLASH_STRING(spsleep, "Start Winterruhe (DD:MM)");
+FLASH_STRING(spsleepincr, "Winterruhe Inkrement pro Tag (Minuten)");
+
 FLASH_STRING(err_unknprog, "Fehler: Unbekanntes Programm!");
 FLASH_STRING(err_unknprogid, "Fehler: Program ID nicht angegeben!");
 

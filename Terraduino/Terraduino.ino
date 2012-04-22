@@ -125,6 +125,8 @@ uint8_t numchannels = 7;
 uint8_t numswitches = 6;
 uint8_t i = 0;
 
+uint8_t dayspermonth[] = {  0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
 /* global objects */
 DHT dht(DHTPIN, DHTTYPE);
 Database db;
@@ -254,8 +256,8 @@ void tpl_index(WebServer &server) {
     }
     else {
       server << f_shc_ast << ' ';
-      int B = begin + db.programs[db.channels[channel].program].start_delay;
-      int E = end   - db.programs[db.channels[channel].program].stop_delay;
+      int B = begin + db.programs[db.channels[channel].program].start_delay + elapsed_sleep_days(t, channel);
+      int E = end   - db.programs[db.channels[channel].program].stop_delay  + elapsed_sleep_days(t, channel);
       server << N((B - (B % 60)) / 60); // start hour
       server << ':';
       server << N(B % 60); // stop hour
@@ -421,6 +423,16 @@ void tpl_editprogram(WebServer &server) {
   // cooldown 7:cooldown.i8
   server << tra << tdr << spcooldown << tde << td;
   server << spf5 << 8 << sdfv << db.programs[post.i1].cooldown << sdfe << f_shc_min;
+  server << tde << tre;
+  
+  // sleepday
+  server << tra << tdr << spsleep << tde << td;
+  server << spf5 << 9  << sdfv << N(db.programs[post.i1].sleep_day) << sdfe << '.';
+  server << spf5 << 10 << sdfv << N(db.programs[post.i1].sleep_mon) << sdfe;
+  server << tde << tre;
+  
+  server << tra << tdr << spsleepincr << tde << td;
+  server << spf5 << 11 << sdfv << N(db.programs[post.i1].sleep_increment) << sdfe << f_shc_min;
   server << tde << tre;
 
   server << tablee << submit << forme << hfoot;
@@ -748,15 +760,18 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
   if (type == WebServer::POST)  {
     while (parsing) {
       parsing = server.readPOSTparam(parsename, 32, parsevalue, 32);
-      if (strcmp(parsename, "0") == 0){post.i1 = atoi(parsevalue);}
-      if (strcmp(parsename, "1") == 0){post.i2 = atoi(parsevalue);}
-      if (strcmp(parsename, "2") == 0){post.i3 = atoi(parsevalue);}
-      if (strcmp(parsename, "3") == 0){post.i4 = atoi(parsevalue);}
-      if (strcmp(parsename, "4") == 0){post.i5 = atoi(parsevalue);}
-      if (strcmp(parsename, "5") == 0){post.i6 = atoi(parsevalue);}
-      if (strcmp(parsename, "6") == 0){post.i7 = atoi(parsevalue);}
-      if (strcmp(parsename, "7") == 0){post.i8 = atoi(parsevalue);}
-      if (strcmp(parsename, "8") == 0){post.i9 = atoi(parsevalue);}
+      if (strcmp(parsename, "0")  == 0){post.i1  = atoi(parsevalue);}
+      if (strcmp(parsename, "1")  == 0){post.i2  = atoi(parsevalue);}
+      if (strcmp(parsename, "2")  == 0){post.i3  = atoi(parsevalue);}
+      if (strcmp(parsename, "3")  == 0){post.i4  = atoi(parsevalue);}
+      if (strcmp(parsename, "4")  == 0){post.i5  = atoi(parsevalue);}
+      if (strcmp(parsename, "5")  == 0){post.i6  = atoi(parsevalue);}
+      if (strcmp(parsename, "6")  == 0){post.i7  = atoi(parsevalue);}
+      if (strcmp(parsename, "7")  == 0){post.i8  = atoi(parsevalue);}
+      if (strcmp(parsename, "8")  == 0){post.i9  = atoi(parsevalue);}
+      if (strcmp(parsename, "9")  == 0){post.i10 = atoi(parsevalue);}
+      if (strcmp(parsename, "10") == 0){post.i11 = atoi(parsevalue);}
+      if (strcmp(parsename, "11") == 0){post.i12 = atoi(parsevalue);}
     }
 
     int error = 0;
@@ -792,7 +807,8 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       err_cooldown.copy(post.s1);
       error = 1;
     }
-
+    // FIXME: check sleep*
+    
     if(! error) {
       Program p = db.programs[post.i1];
       p.type       = post.i2;
@@ -803,6 +819,9 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       p.start_delay= post.i7;
       p.stop_delay = post.i8;
       p.cooldown   = post.i9;
+      p.sleep_day  = post.i10;
+      p.sleep_mon  = post.i11;
+      p.sleep_increment  = post.i12;
       ee_wr_program(p);
       progdone.copy(post.s1);
       delay(10);
@@ -857,6 +876,68 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
 /*
  * Helper functions
  */
+bool isleafyear(uint8_t Y) {
+  /* tell if current year is a leaf year */
+  if ((Y % 400) == 0)
+    return true;
+  else if ((Y % 100) == 0)
+    return false;
+  else if ((Y % 4) == 0)
+    return true;
+
+  return false;
+}  
+
+uint8_t getdayspermonth(uint8_t M, uint8_t Y) {
+  /* how many days has the current month */
+  if (M == 2)   {
+    if (isleafyear(Y))
+      return 29;
+    else
+      return 28;
+  }
+
+  if ((M >= 1) && (M <= 12)) {
+    return dayspermonth[M];
+  }
+  else {
+    return 0;
+  }
+} 
+
+int getdayofyear(uint8_t T, uint8_t M, int Y) {
+  /* the how many'th day of year is the current day */
+  if ((M == 0) || (M > 12)) {
+    return -1;
+  }
+
+  uint8_t LT = T;
+  uint8_t LM = M;
+
+  while (LM > 1) {
+    LM--;
+    LT += getdayspermonth(LM, Y);
+  }
+
+  return LT;
+}  
+
+uint8_t elapsed_sleep_days(time_t t, uint8_t channel) {
+ /* check if we are within sleep time and if yes, return the number of minutes
+  * to add to *_delay
+  */
+ if(db.programs[db.channels[channel].program].sleep_day > 0 && db.programs[db.channels[channel].program].sleep_mon > 0) {
+   // ok, sleep time enabled
+   int cur_day = getdayofyear(day(t), month(t), year(t));
+   int con_day = getdayofyear(db.programs[db.channels[channel].program].sleep_day, db.programs[db.channels[channel].program].sleep_mon, year(t));
+   if(cur_day >= con_day) {
+     // ok, sleep date is earlier than current date
+     return (cur_day - con_day) * db.programs[db.channels[channel].program].sleep_increment;
+   }
+ }
+ return 0;
+}
+
 void software_Reset() {
   /*
    * Restarts program from beginning but does not reset the peripherals and registers
@@ -957,14 +1038,13 @@ int operate(int channel, time_t t) {
     end   = (prog.stop_hour * 60)  + prog.stop_min;
   }
   else {
-
     // fetch sunrise for current day from progmem table
     begin = getsunrise(t);
     delay(1); /* this delay is to fix a bug in flash library */
     end   = getsunset(t);
 
-    begin += prog.start_delay;
-    end   -= prog.stop_delay;
+    begin += prog.start_delay + elapsed_sleep_days(t, channel);
+    end   -= prog.stop_delay  + elapsed_sleep_days(t, channel);
   }
 
   // current time in minutes (seconds ignored)
