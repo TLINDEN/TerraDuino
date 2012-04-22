@@ -254,16 +254,15 @@ void tpl_index(WebServer &server) {
     }
     else {
       server << f_shc_ast << ' ';
-      begin += db.programs[db.channels[channel].program].start_delay;
-      end   -= db.programs[db.channels[channel].program].stop_delay;
-      //          N((begin - (begin % 60)) / 60);
-      server << N((begin - (begin % 60)) / 60); // start hour
+      int B = begin + db.programs[db.channels[channel].program].start_delay;
+      int E = end   - db.programs[db.channels[channel].program].stop_delay;
+      server << N((B - (B % 60)) / 60); // start hour
       server << ':';
-      server << N(begin % 60); // stop hour
+      server << N(B % 60); // stop hour
       server << f_shc_clock << bis;
-      server << N((end - (end % 60)) / 60); // start hour
+      server << N((E - (E % 60)) / 60); // start hour
       server << ':';
-      server << N(end % 60) << f_shc_clock; // stop hour
+      server << N(E % 60) << f_shc_clock; // stop hour
     }
     if(db.programs[db.channels[channel].program].type != MANUAL) {
       if( db.programs[db.channels[channel].program].cooldown > 0 ) {
@@ -1892,8 +1891,7 @@ void setup() {
 
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
-  //beep();
-  //playNote(notes[0], beats[0] * tempo);
+  beep();
   Serial << f_mem <<  freeMemory() << endl;
   Serial << f_prompt;
 }
