@@ -73,7 +73,8 @@ long airtimerinterval = 500; // 72000; // 10 min
 long airtimer;
 long airmoment;
 bool airon;
-int channel;
+uint8_t channel;
+uint8_t program;
 bool INIT = true;
 bool RUN  = false;
 uint8_t runtime;
@@ -106,16 +107,19 @@ bool parsing = true;
 /* PINs */
 const uint8_t switches[] = { 15, 49, 47, 45, 43, 41 };
 const uint8_t leds[]     = { 16, 48, 46, 44, 42, 40 };
-const uint8_t relays[]   = { 36, 34, 32, 30, 28, 26 };
+const uint8_t relays[]   = { 36, 34, 32, 30, 28, 26, 22 };
 uint8_t state[]          =  { 0, 0, 0, 0, 0, 0 };
 uint8_t runstate[]       =  { 0, 0, 0, 0, 0, 0 };
-String names[] = { "70 W Links", "70 W Rechts", "40 W Vorn", "40 W Hinten", "15 W Links", "15 W Rechts"};
+String names[] = { "70 W Links", "70 W Rechts", "40 W Vorn", "40 W Hinten", "15 W Links", "15 W Rechts", "Reserve"};
 const uint8_t air        = 24;
 const uint8_t statusled  = 27;
 const uint8_t speaker    = 17;
 const uint8_t mainswitch = 19;
 const uint8_t mainled    = 18;
 
+uint8_t numchannels = 7;
+uint8_t numswitches = 6;
+uint8_t i = 0;
 
 /* global objects */
 DHT dht(DHTPIN, DHTTYPE);
@@ -216,10 +220,10 @@ void tpl_index(WebServer &server) {
   delay(1);
   end   = getsunset(t);
   server << tablesm;
-  for (uint8_t i=0; i<6; i++) {
-    server << tra << td << chlinkl << i << chlinkr << names[i] << chlinke << ':' << tde << td;
-    if(manual || db.programs[db.channels[i].program].type == MANUAL) {
-      if(state[i] == HIGH) {
+  for (channel=0; channel<numchannels; channel++) {
+    server << tra << td << chlinkl << channel << chlinkr << names[channel] << chlinke << ':' << tde << td;
+    if(manual || db.programs[db.channels[channel].program].type == MANUAL) {
+      if(state[channel] == HIGH) {
         server << irun;
       }
       else {
@@ -227,7 +231,7 @@ void tpl_index(WebServer &server) {
       }
     }
     else {
-      if(operate(i, t)) {
+      if(operate(channel, t)) {
         server << irun;
       }
       else {
@@ -235,18 +239,18 @@ void tpl_index(WebServer &server) {
       }
     }
     server << tde << td;
-    server << prlinkl << db.channels[i].program << chlinkr;
-    if(db.programs[db.channels[i].program].type == MANUAL) {
+    server << prlinkl << db.channels[channel].program << chlinkr;
+    if(db.programs[db.channels[channel].program].type == MANUAL) {
       server << f_shc_man; 
     }
-    else if(db.programs[db.channels[i].program].type == STATIC) {
-      server << f_shc_st << ' ' << N(db.programs[db.channels[i].program].start_hour) << ':' << N(db.programs[db.channels[i].program].start_min);
-      server << bis << N(db.programs[db.channels[i].program].stop_hour) << ':' << N(db.programs[db.channels[i].program].stop_min);
+    else if(db.programs[db.channels[channel].program].type == STATIC) {
+      server << f_shc_st << ' ' << N(db.programs[db.channels[channel].program].start_hour) << ':' << N(db.programs[db.channels[channel].program].start_min);
+      server << bis << N(db.programs[db.channels[channel].program].stop_hour) << ':' << N(db.programs[db.channels[channel].program].stop_min);
     }
     else {
       server << f_shc_ast << ' ';
-      begin += db.programs[db.channels[i].program].start_delay;
-      end   -= db.programs[db.channels[i].program].stop_delay;
+      begin += db.programs[db.channels[channel].program].start_delay;
+      end   -= db.programs[db.channels[channel].program].stop_delay;
       //          N((begin - (begin % 60)) / 60);
       server << N((begin - (begin % 60)) / 60); // start hour
       server << ':';
@@ -256,9 +260,9 @@ void tpl_index(WebServer &server) {
       server << ':';
       server << N(end % 60); // stop hour
     }
-    if(db.programs[db.channels[i].program].type != MANUAL) {
-      if( db.programs[db.channels[i].program].cooldown > 0 ) {
-        server << f_shc_delay << db.programs[db.channels[i].program].cooldown << f_shc_min;
+    if(db.programs[db.channels[channel].program].type != MANUAL) {
+      if( db.programs[db.channels[channel].program].cooldown > 0 ) {
+        server << f_shc_delay << db.programs[db.channels[channel].program].cooldown << f_shc_min;
       }
     }
     server << chlinke << tde << tre;
@@ -288,11 +292,11 @@ void tpl_channels(WebServer &server) {
   server << hhead << tchannels << hmenu << chc;
   server << tablechan;
 
-  for(int i=0; i<6; i++) {
+  for(channel=0; channel<numchannels; channel++) {
     server << tra << td;
-    server << chlinkl << i << chlinkr << names[i] << chlinke << tde;
+    server << chlinkl << channel << chlinkr << names[channel] << chlinke << tde;
     server << td;
-    prog2web(db.channels[i].program, server);
+    prog2web(db.channels[channel].program, server);
     server << tde;
   }
   server << tre << tablee << hfoot;
@@ -327,13 +331,13 @@ void tpl_setprogram(WebServer &server) {
     server << sdchannel << names[post.i1] << br;
     server << hidden << post.i1 << sdfe;
     server << sdpc << spsel;
-    for(int i=0; i<maxprograms; i++) {
-      server << opt << i << '"';
-      if(i == db.channels[post.i1].program) {
+    for(program = 0; program<maxprograms; program++) {
+      server << opt << program << '"';
+      if(program == db.channels[post.i1].program) {
         server << selected;
       }
       server << '>';
-      prog2web(i, server);
+      prog2web(program, server);
       server << opte;
     }
     server << sele << br << submit << forme;
@@ -345,10 +349,10 @@ void tpl_programs(WebServer &server) {
   server << hhead << tprog << hmenu << chp;
   server << msg1 << post.s1 << msg2;
   server << tableprog;
-  for(int i=0; i<maxprograms; i++) {
+  for(program = 0; program<maxprograms; program++) {
     server << tra << td;
-    server << prlinkl << i << chlinkr << i << chlinke << td;
-    prog2web(i, server);
+    server << prlinkl << program << chlinkr << program << chlinke << td;
+    prog2web(program, server);
     server << tde << tre;
   }
   server << tablee << hfoot;
@@ -363,7 +367,7 @@ void tpl_editprogram(WebServer &server) {
   server << tableprogset;
   server << spsel;
 
-  for (int i=0; i<3; i++) {
+  for (i=0; i<3; i++) {
     server << opt << i << '"';
     if(db.programs[post.i1].type == i) {
       server << selected;
@@ -615,7 +619,7 @@ void www_setprogram(WebServer &server, WebServer::ConnectionType type, char *url
 	rc = server.nextURLparam(&url_tail, parsename, 32, parsevalue, 32);
 	if (strcmp(parsename, "channel") == 0){post.i1 = atoi(parsevalue); Serial << "uri chan: " << post.i1 << endl;}
       }
-      if(post.i1 < 0 || post.i1 > 5) {
+      if(post.i1 < 0 || post.i1 > 6) {
         err_unknchan.copy(post.s1);
 	tpl_setprogram(server);
 	return;
@@ -953,7 +957,7 @@ void blink() {
    * short on, long off, so that the
    * blinking is visible
    */
-  for(int i=0; i<3; i++) {
+  for(i=0; i<3; i++) {
     digitalWrite(statusled, HIGH);
     delay(10);
     digitalWrite(statusled, LOW);
@@ -1012,7 +1016,7 @@ void check_switches(bool init) {
     sttimer = 0;
   }
 
-  for(channel=0; channel<6; channel++) {
+  for(channel=0; channel<numswitches; channel++) {
     swpressed = digitalRead(switches[channel]);
     if(swpressed && (manual || db.programs[db.channels[channel].program].type == MANUAL)) {
       // remember how long the channel is already running
@@ -1083,7 +1087,7 @@ void check_timers(bool init) {
 
     if(init || moment - timer > timerintervall) {
       t = gettimeofday();
-      for(channel=0; channel<6; channel++) {
+      for(channel=0; channel<numchannels; channel++) {
         if(db.programs[db.channels[channel].program].type == MANUAL) {
           break; 
         }
@@ -1187,25 +1191,25 @@ void sh_channels() {
   /*
    * shows all channel configs with program assignments
    */
-  for(int i=0; i<6; i++) {
-    Serial << f_shc_cn << i << f_colon << names[i] << f_shc_cfg << endl;
-    Serial << f_shc_pr << db.channels[i].program << endl;
+  for(channel=0; channel<numchannels; channel++) {
+    Serial << f_shc_cn << channel << f_colon << names[channel] << f_shc_cfg << endl;
+    Serial << f_shc_pr << db.channels[channel].program << endl;
     Serial << f_shc_typ;
-    if(db.programs[db.channels[i].program].type == STATIC) {
+    if(db.programs[db.channels[channel].program].type == STATIC) {
       Serial << f_shc_st << endl;
-      Serial << f_shc_start << N(db.programs[db.channels[i].program].start_hour) << ':' << N(db.programs[db.channels[i].program].start_min) << endl;
-      Serial << f_shc_stop  << N(db.programs[db.channels[i].program].stop_hour)  << ':' << N(db.programs[db.channels[i].program].stop_min)  << endl;
+      Serial << f_shc_start << N(db.programs[db.channels[channel].program].start_hour) << ':' << N(db.programs[db.channels[channel].program].start_min) << endl;
+      Serial << f_shc_stop  << N(db.programs[db.channels[channel].program].stop_hour)  << ':' << N(db.programs[db.channels[channel].program].stop_min)  << endl;
     }
-    else if(db.programs[db.channels[i].program].type == MANUAL) {
+    else if(db.programs[db.channels[channel].program].type == MANUAL) {
       Serial << f_shc_man << endl;
     }
     else {
       Serial << f_shc_ast << endl;
-      Serial << f_shc_stdel  << db.programs[db.channels[i].program].start_delay << f_shc_min << endl;
-      Serial << f_shc_stodel << db.programs[db.channels[i].program].stop_delay  << f_shc_min << endl;
+      Serial << f_shc_stdel  << db.programs[db.channels[channel].program].start_delay << f_shc_min << endl;
+      Serial << f_shc_stodel << db.programs[db.channels[channel].program].stop_delay  << f_shc_min << endl;
     }
-    if(db.programs[db.channels[i].program].cooldown > 0) {
-      Serial << f_shc_delay << db.programs[db.channels[i].program].cooldown << f_shc_min << endl;
+    if(db.programs[db.channels[channel].program].cooldown > 0) {
+      Serial << f_shc_delay << db.programs[db.channels[channel].program].cooldown << f_shc_min << endl;
     }
   }
 }
@@ -1214,23 +1218,23 @@ void sh_programs() {
   /*
    * show all saved programs in EEPROM
    */
-  for(int p=0; p<maxprograms; p++) {
-    Serial << f_shc_pn << p << endl << f_shc_typ;
-    if(db.programs[p].type == STATIC) {
+  for(program = 0; program<maxprograms; program++) {
+    Serial << f_shc_pn << program << endl << f_shc_typ;
+    if(db.programs[program].type == STATIC) {
        Serial << f_shc_st << endl;
-       Serial << f_shc_start << N(db.programs[p].start_hour) << ':' << N(db.programs[p].start_min) << endl;
-       Serial << f_shc_stop  << N(db.programs[p].stop_hour)  << ':' << N(db.programs[p].stop_min)  << endl;
+       Serial << f_shc_start << N(db.programs[program].start_hour) << ':' << N(db.programs[program].start_min) << endl;
+       Serial << f_shc_stop  << N(db.programs[program].stop_hour)  << ':' << N(db.programs[program].stop_min)  << endl;
     }
-    else if(db.programs[p].type == MANUAL) {
+    else if(db.programs[program].type == MANUAL) {
       Serial << f_shc_man << endl;
     }
     else {
       Serial << f_shc_ast << endl;
-      Serial << f_shc_stdel  << db.programs[p].start_delay << f_shc_min << endl;
-      Serial << f_shc_stodel << db.programs[p].stop_delay  << f_shc_min << endl;
+      Serial << f_shc_stdel  << db.programs[program].start_delay << f_shc_min << endl;
+      Serial << f_shc_stodel << db.programs[program].stop_delay  << f_shc_min << endl;
     }
-    if(db.programs[p].cooldown > 0) {
-      Serial << f_shc_delay << db.programs[p].cooldown << f_shc_sec << endl;
+    if(db.programs[program].cooldown > 0) {
+      Serial << f_shc_delay << db.programs[program].cooldown << f_shc_sec << endl;
     }
   }
 }
@@ -1245,7 +1249,7 @@ void sh_air(char parameter[MAXBYTES]) {
     int nvalue;
     char buffer[2];
     byte idx = 0;
-    for(int i=0; parameter[i]; i++) {
+    for(i=0; parameter[i]; i++) {
       if(parameter[i] > '0' || parameter[i] < '9') {
 	// a digit
 	buffer[idx] = parameter[i];
@@ -1315,7 +1319,7 @@ void sh_ip(char parameter[MAXBYTES]) {
     // ip given, parse it
     nvalue = 0;
     idx    = 0;
-    for(int i=0; parameter[i]; i++) {
+    for(i=0; parameter[i]; i++) {
       if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
 	buffer[idx] = parameter[i];
@@ -1349,7 +1353,7 @@ void sh_ip(char parameter[MAXBYTES]) {
       return;
     }
     else {
-      for(int i=0; i<4; i++) {
+      for(i=0; i<4; i++) {
 	if(value[i] < 0 || value[i] > 255) {
 	  beep();
           Serial << f_sherr_form << f_sherr_exoct << endl;
@@ -1386,7 +1390,7 @@ void sh_setdate(char parameter[MAXBYTES]) {
     // date given, parse it
     nvalue = 0;
     idx = 0;
-    for(int i=0; parameter[i]; i++) {
+    for(i=0; parameter[i]; i++) {
       if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
 	buffer[idx] = parameter[i];
@@ -1459,9 +1463,7 @@ void sh_settime(char parameter[MAXBYTES]) {
    */
   if(parameter[0] != '\0') {
     // time given, parse it
-
-    
-    for(int i=0; parameter[i]; i++) {
+    for(i=0; parameter[i]; i++) {
       if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
 	buffer[idx] = parameter[i];
@@ -1550,23 +1552,24 @@ void sh_pins() {
   Serial << f_shp_head << endl;
   Serial << f_shp_line << endl;
   Serial << f_shp_pin << mainswitch << f_shp_2sp;
-  for (int i=0; i<6; i++) {
-    Serial << f_shp_pipe << switches[i] << f_shp_2sp;
+  for(channel=0; channel<numswitches; channel++) {
+    Serial << f_shp_pipe << switches[channel] << f_shp_2sp;
   }
   Serial << endl;
   Serial << f_shp_line << endl;
+  
   Serial << f_shp_mode << displaypin(digitalRead(mainswitch)) << f_shp_2sp;
-  for (int i=0; i<6; i++) {
-    Serial << f_shp_pipe1 << displaypin(state[i]) << f_shp_2sp;
+  for(channel=0; channel<numchannels; channel++) {
+    Serial << f_shp_pipe1 << displaypin(state[channel]) << f_shp_2sp;
   }
   Serial << endl;
   Serial << f_shp_line << endl;
   Serial << f_shp_rel;
-  for (int i=0; i<6; i++) {
-    int ops = operate(i, t);
+  for(channel=0; channel<numchannels; channel++) {
+    int ops = operate(channel, t);
     Serial << f_shp_pipe1;
     if(manual) {
-      Serial << displaypin(state[i]); 
+      Serial << displaypin(state[channel]); 
     }
     else {
       Serial << displaypin(ops);
@@ -1753,12 +1756,15 @@ void setup() {
   check_main(INIT);
 
   Serial << "init switches ";
-  for(int i=0; i<6; i++) {
+  for(channel=0; channel<numswitches; channel++) {
     blink();
-    Serial << i;
-    pinMode(switches[i], INPUT);
-    pinMode(leds[i],     OUTPUT);
-    pinMode(relays[i],   OUTPUT);
+    Serial << channel;
+    pinMode(switches[channel], INPUT);
+    pinMode(leds[channel],     OUTPUT);
+  }
+  
+  for(channel=0; channel<numchannels; channel++) {
+    pinMode(relays[channel],   OUTPUT);
   }
   Serial << endl;
   

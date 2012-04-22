@@ -37,8 +37,8 @@ FLASH_STRING(f_sh_initres, "Initiating a soft reset");
 FLASH_STRING(f_sh_inv, "Invalid Command (try 'h' to get help) ");
 
 FLASH_STRING(f_shp_tit, "Current PIN states:");
-FLASH_STRING(f_shp_head, "Switch | MAIN | Ch1 | Ch2 | Ch3 | Ch4 | Ch5 | Ch6"); 
-FLASH_STRING(f_shp_line, "-------+------+-----+-----+-----+-----+-----+-----");
+FLASH_STRING(f_shp_head, "Switch | MAIN | CH1 | CH2 | CH3 | CH4 | CH5 | CH6 | CH7"); 
+FLASH_STRING(f_shp_line, "-------+------+-----+-----+-----+-----+-----+-----+-----");
 FLASH_STRING(f_shp_pin, "  PIN  |  ");
 FLASH_STRING(f_shp_pipe, "| ");
 FLASH_STRING(f_shp_pipe1, "|  ");
