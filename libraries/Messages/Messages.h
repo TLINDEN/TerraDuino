@@ -65,6 +65,8 @@ FLASH_STRING(f_sherr_exyea, "year not within 2010-3600");
 FLASH_STRING(f_sherr_hhmmmis, "Error: Parameter in the form HH:MM:SS missing!");
 FLASH_STRING(f_sherr_ddmmmis, "Error: Parameter in the form DD.MM.YYYY missing!");
 
+FLASH_STRING(f_sherr, "Warning: Temperature too low for too long!");
+
 FLASH_STRING(f_sht_timesav, "Time successfully changed to ");
 FLASH_STRING(f_sht_datesav, "Date successfully changed to ");
 FLASH_STRING(f_sht_ipsav, "IP address successfully changed to ");
@@ -87,6 +89,9 @@ FLASH_STRING(f_shc_stdel, "    Start Delay: ");
 FLASH_STRING(f_shc_stodel, "     Stop Delay: ");
 FLASH_STRING(f_shc_min, " Minuten");
 FLASH_STRING(f_shc_sec, " Sekunden");
+FLASH_STRING(f_shc_1min, " Minute");
+FLASH_STRING(f_shc_1sec, " Sekunde");
+FLASH_STRING(f_shc_clock, " Uhr");
 FLASH_STRING(f_shc_delay, " Einschalt Verzoegerung: ");
 FLASH_STRING(f_shc_man, "Manuell");
 
@@ -288,6 +293,8 @@ FLASH_STRING(err_delay1, "Fehler: Start Verz&ouml;gerung ! 0-65536!");
 FLASH_STRING(err_delay2, "Fehler: Stop Verz&ouml;gerung ! 0-65536!");
 FLASH_STRING(err_cooldown, "Fehler: Einschalt Verz&ouml;gerung ! 0-65536!");
 
+FLASH_STRING(err_ip, "Fehler: IP Adresse ! (1-255).(0-255).(0-255).(0-255)!");
+
 FLASH_STRING(progdone, "Programm wurde gespeichert");
 
 FLASH_STRING(ipform,
@@ -302,7 +309,14 @@ FLASH_STRING(airactive, "Aktiv");
 FLASH_STRING(airinactive, "Inaktiv");
 FLASH_STRING(tmin, "Tmin (schaltet L&uuml;fter aus):");
 FLASH_STRING(tmax, "Tmax (schaltet L&uuml;fter ein):");
+FLASH_STRING(talarm, "<br/>Alarm wenn T weniger als:");
 FLASH_STRING(err_air, "Fehler: Temperatur 0-65!");
 FLASH_STRING(airdone, "Klimaeinstellungen gespeichert");
 
 
+FLASH_STRING(err_hour, "Fehler: Stunde ! 0-23");
+FLASH_STRING(err_min, "Fehler: Minute ! 0-59");
+FLASH_STRING(err_sec, "Fehler: Sekunde ! 0-59");
+FLASH_STRING(err_day, "Fehler: Tag ! 1-31");
+FLASH_STRING(err_mon, "Fehler: Monat ! 1-12");
+FLASH_STRING(err_yea, "Fehler: Jahr ! 2010-3600");

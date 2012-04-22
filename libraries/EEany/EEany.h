@@ -39,7 +39,7 @@ struct Settings {
   uint8_t octet4;
   int  air_tmin;
   int  air_tmax;
-  int  i3;
+  int  air_alarm;
   int  i4;
 };
 

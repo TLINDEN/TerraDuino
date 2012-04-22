@@ -69,10 +69,14 @@ long timer;
 long moment;
 long sttimer;
 long stmoment;
-long airtimerinterval = 500; // 72000; // 10 min
+long airtimerinterval = 72000; // 10 min
 long airtimer;
 long airmoment;
 bool airon;
+
+long alarmpaused;
+int alarmwait = 120; // min, 2 hours
+
 uint8_t channel;
 uint8_t program;
 bool INIT = true;
@@ -200,7 +204,7 @@ void tpl_index(WebServer &server) {
   server << tra << tdr << itemp << tde << td << post.i1 << igrad << tde << tre;
   server << tra << tdr << ihum  << tde << td << post.i2 << iperc << tde << tre;
   server << tra << tdr << itime << tde << td << N(post.i3) << '.' << N(post.i4) << '.' << post.i5;
-  server << ' ' << N(post.i6) << ':' << N(post.i7) << ':' << N(post.i8) << tde << tre;
+  server << ' ' << N(post.i6) << ':' << N(post.i7) << ':' << N(post.i8) << f_shc_clock << tde << tre;
   
   server << tra << tdr << imode << tde << td ;
   if(manual) {
@@ -211,8 +215,8 @@ void tpl_index(WebServer &server) {
   }
   server << tde << tre;
 
-  server << tra << tdr << isunr << tde << td << N(post.i9)  << ':' << N(post.i10) << tde << tre;
-  server << tra << tdr << isuns << tde << td << N(post.i11) << ':' << N(post.i12) << tde << tre;
+  server << tra << tdr << isunr << tde << td << N(post.i9)  << ':' << N(post.i10) << f_shc_clock << tde << tre;
+  server << tra << tdr << isuns << tde << td << N(post.i11) << ':' << N(post.i12) << f_shc_clock << tde << tre;
   
   server << tra << tdrt << ichan << tde << td;
   t = gettimeofday();
@@ -245,7 +249,8 @@ void tpl_index(WebServer &server) {
     }
     else if(db.programs[db.channels[channel].program].type == STATIC) {
       server << f_shc_st << ' ' << N(db.programs[db.channels[channel].program].start_hour) << ':' << N(db.programs[db.channels[channel].program].start_min);
-      server << bis << N(db.programs[db.channels[channel].program].stop_hour) << ':' << N(db.programs[db.channels[channel].program].stop_min);
+      server << f_shc_clock << bis << N(db.programs[db.channels[channel].program].stop_hour) << ':' << N(db.programs[db.channels[channel].program].stop_min);
+      server << f_shc_clock;
     }
     else {
       server << f_shc_ast << ' ';
@@ -255,14 +260,20 @@ void tpl_index(WebServer &server) {
       server << N((begin - (begin % 60)) / 60); // start hour
       server << ':';
       server << N(begin % 60); // stop hour
-      server << bis;
+      server << f_shc_clock << bis;
       server << N((end - (end % 60)) / 60); // start hour
       server << ':';
-      server << N(end % 60); // stop hour
+      server << N(end % 60) << f_shc_clock; // stop hour
     }
     if(db.programs[db.channels[channel].program].type != MANUAL) {
       if( db.programs[db.channels[channel].program].cooldown > 0 ) {
-        server << f_shc_delay << db.programs[db.channels[channel].program].cooldown << f_shc_min;
+        server << f_shc_delay << db.programs[db.channels[channel].program].cooldown;
+        if(db.programs[db.channels[channel].program].cooldown == 1) {
+          server << f_shc_1min;
+        }
+        else {
+           server << f_shc_min;
+        }
       }
     }
     server << chlinke << tde << tre;
@@ -389,28 +400,28 @@ void tpl_editprogram(WebServer &server) {
   // start 1:hour.i2 2:minute.i3
   server << tra << tdr << f_shc_start << tde << td;
   server << spf2 << 2 << sdfv << N(db.programs[post.i1].start_hour) << sdfe << ':';
-  server << spf2 << 3 << sdfv << N(db.programs[post.i1].start_min)  << sdfe;
+  server << spf2 << 3 << sdfv << N(db.programs[post.i1].start_min)  << sdfe << f_shc_clock;
   server << tde << tre;
 
   // stop 3:hour.i4 4:minute.i5
   server << tra << tdr << f_shc_stop << tde << td;
   server << spf2 << 4 << sdfv << N(db.programs[post.i1].stop_hour) << sdfe << ':';
-  server << spf2 << 5 << sdfv << N(db.programs[post.i1].stop_min)  << sdfe;
+  server << spf2 << 5 << sdfv << N(db.programs[post.i1].stop_min)  << sdfe << f_shc_clock;
   server << tde << tre;
 
   // startdelay 5:startdelay.i6
   server << tra << tdr << f_shc_stdel << tde << td;
-  server << spf5 << 6 << sdfv << db.programs[post.i1].start_delay << sdfe;
+  server << spf5 << 6 << sdfv << db.programs[post.i1].start_delay << sdfe << f_shc_min;
   server << tde << tre;
 
   // startdelay 6:startdelay.i7
   server << tra << tdr << f_shc_stodel << tde << td;
-  server << spf5 << 7 << sdfv << db.programs[post.i1].stop_delay << sdfe;
+  server << spf5 << 7 << sdfv << db.programs[post.i1].stop_delay << sdfe << f_shc_min;
   server << tde << tre;
 
   // cooldown 7:cooldown.i8
   server << tra << tdr << spcooldown << tde << td;
-  server << spf5 << 8 << sdfv << db.programs[post.i1].cooldown << sdfe;
+  server << spf5 << 8 << sdfv << db.programs[post.i1].cooldown << sdfe << f_shc_min;
   server << tde << tre;
 
   server << tablee << submit << forme << hfoot;
@@ -448,10 +459,13 @@ void tpl_setair(WebServer &server) {
   server << tde << tre;
 
   server << tra << tdr << tmin << tde;
-  server << td << spf2 << 2 << sdfv << db.settings.air_tmin << sdfe << tde << tre;
+  server << td << spf2 << 2 << sdfv << db.settings.air_tmin << sdfe << igrad << tde << tre;
 
   server << tra << tdr << tmax << tde;
-  server << td << spf2 << 3 << sdfv << db.settings.air_tmax << sdfe << tde << tre;
+  server << td << spf2 << 3 << sdfv << db.settings.air_tmax << sdfe << igrad << tde << tre;
+  
+  server << tra << tdr << talarm << tde;
+  server << td << spf2 << 4 << sdfv << db.settings.air_alarm << sdfe << igrad << tde << tre;
 
   server << tablee << submit << forme << hfoot;
 }
@@ -551,6 +565,37 @@ void www_setdate(WebServer &server, WebServer::ConnectionType type, char *, bool
       if (strcmp(parsename, "6")  == 0){post.i7 = atoi(parsevalue); }
     }
     
+    int error = 0;
+    if(post.i1 > 31) {
+      error = 1;
+      err_day.copy(post.s1);
+    }
+    if(post.i2 > 12) {
+      error = 1;
+      err_mon.copy(post.s1);
+    }
+    if(post.i3 > 3600) {
+      error = 1;
+      err_yea.copy(post.s1);
+    }
+    if(post.i4 > 23) {
+      error = 1;
+      err_hour.copy(post.s1);
+    }
+    if(post.i5 > 59) {
+      error = 1;
+      err_min.copy(post.s1);
+    }
+    if(post.i6 > 59) {
+      error = 1;
+      err_sec.copy(post.s1);
+    }
+    
+    if(error) {
+      tpl_setdate(server);
+      return;
+    }
+    
     // set the time, first run, using raw input
     setTime(post.i4, post.i5, post.i6, post.i1, post.i2, post.i3);
     t = now();
@@ -591,6 +636,12 @@ void www_setip(WebServer &server, WebServer::ConnectionType type, char *, bool) 
       if (strcmp(parsename, "1") == 0){post.i2 = atoi(parsevalue);}
       if (strcmp(parsename, "2") == 0){post.i3 = atoi(parsevalue);}
       if (strcmp(parsename, "3") == 0){post.i4 = atoi(parsevalue);}
+    }
+
+    if(post.i1 < 1 || post.i1 > 255 || post.i2 > 255 || post.i3 > 255 || post.i4 > 255) {
+      err_ip.copy(post.s1);
+      tpl_setip(server);
+      return;
     }
 
     Settings S = db.settings;
@@ -775,9 +826,10 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
       if (strcmp(parsename, "1")  == 0){post.i1 = atoi(parsevalue);}
       if (strcmp(parsename, "2")  == 0){post.i2 = atoi(parsevalue);}
       if (strcmp(parsename, "3")  == 0){post.i3 = atoi(parsevalue);}
+      if (strcmp(parsename, "4")  == 0){post.i4 = atoi(parsevalue);}
     }
 
-    if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65) {
+    if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65 || post.i4 < 0 || post.i4 > 65) {
       err_air.copy(post.s1);
       tpl_setair(server);
       return;
@@ -792,6 +844,8 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
       }
       S.air_tmin = post.i2;
       S.air_tmax = post.i3;
+      S.air_alarm= post.i4;
+      
       ee_wr_settings(S);
       airdone.copy(post.s1);
       db = ee_getdb();
@@ -971,7 +1025,25 @@ void beep() {
 }
 
 
-
+void alarm() {
+  /* play an alarm melody */
+  playTone(NOTE_B, 300);
+  playTone(NOTE_E, 100);
+  delay(100);
+  playTone(NOTE_G, 500);
+  delay(300);
+  
+  playTone(NOTE_B, 300);
+  playTone(NOTE_E, 100);
+  delay(100);
+  playTone(NOTE_G, 500);
+  delay(300);
+  
+  playTone(NOTE_B, 300);
+  playTone(NOTE_E, 100);
+  delay(100);
+  playTone(NOTE_G, 500);
+}
 
 void check_main(bool init) {
   /*
@@ -1140,7 +1212,6 @@ void check_timers(bool init) {
     }
   }
 }
-
 
 void sh_temphumidate() {
   /*
@@ -1681,7 +1752,6 @@ void check_air(bool init) {
    * Turns on aircondition if Tmax has been reached
    * and turns it off if Tmin has been reached.
    */
-  if(db.settings.aircondition) {
     airmoment = millis();
     if(airmoment < airtimer) {
       // millis() rolled over, 50 days are gone, reset timer
@@ -1690,19 +1760,50 @@ void check_air(bool init) {
 
     if(init || airmoment - airtimer > airtimerinterval) {
       float T = temperature();
-      if(T > db.settings.air_tmax) {
-	// turn air condition on
-	digitalWrite(air, LOW);
-	airon = true;
+
+      //Serial << "alarmpaused: " << alarmpaused << ", T: " << T << ", min: " << db.settings.air_alarm << ", wait: " << alarmwait;
+      //Serial << ", elapsed: " << airmoment - airtimer << ", interval: " << airtimerinterval << endl;
+
+      if(db.settings.aircondition) {
+        if(T > db.settings.air_tmax) {
+	  // turn air condition on
+	  digitalWrite(air, LOW);
+	  airon = true;
+        }
+        else if(T < db.settings.air_tmin) {
+	  // turn air condition off
+	  digitalWrite(air, HIGH);
+	  airon = false;
+        }
       }
-      else if(T < db.settings.air_tmin) {
-	// turn air condition off
-	digitalWrite(air, HIGH);
-	airon = false;
+
+      if(db.settings.air_alarm > 0) {
+        // check air alarm
+        t = gettimeofday();
+        
+        if(operate(0, t) || operate(1, t)) {
+          // ok, one of the 70W channels is running
+          if((alarmpaused / 60000) > alarmwait) {
+            // ok, the alarm paused long enough
+            if(T < db.settings.air_alarm) {
+              // ok, it's still too cold
+              Serial << f_sherr << endl;
+              alarm();
+              alarmpaused = 0;
+            }
+          }
+          else {
+            // not enough tim elapsed to raise an alarm
+            alarmpaused += ( airmoment - airtimer );
+          }
+        }
+        else {
+          // out of operating time
+          alarmpaused = 0; 
+        }
       }
+      airtimer = airmoment;
     }
-    airtimer = airmoment;
-  }
 }
 
 
@@ -1791,7 +1892,7 @@ void setup() {
 
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
-  beep();
+  //beep();
   //playNote(notes[0], beats[0] * tempo);
   Serial << f_mem <<  freeMemory() << endl;
   Serial << f_prompt;

@@ -37,7 +37,7 @@ unsigned int ee_init(bool force) {
   db.settings.b4  = false;
   db.settings.air_tmin  = 0;
   db.settings.air_tmin  = 0;
-  db.settings.i3  = 0;
+  db.settings.air_alarm = 0;
   db.settings.i4  = 0;
   db.settings.octet1 = 10;
   db.settings.octet2 = 0;
