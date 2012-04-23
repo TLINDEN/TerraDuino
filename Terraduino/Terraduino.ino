@@ -818,7 +818,6 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
     if(post.i12 < 1 || post.i12 > 31) {
       err_sleepincr.copy(post.s1);
       error = 1;
-      inck
     }
     
     if(! error) {
@@ -888,16 +887,16 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
 void www_rrd(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
   server.httpSuccess();
   server << f_rrd << endl;
-  server temperature() << sep << humidity();
+  server << temperature() << sep << humidity();
   if(manual) {
-    for(channel=0; channel<maxswitches; channel++) {
+    for(channel=0; channel<numswitches; channel++) {
       server << sep << state[channel];
     }
     server << sep << 0;
   }
   else {
-    for(channel=0; channel<maxchannels; channel++) {
-      if(db.programs[db.channels[channel]].type == MANUAL) {
+    for(channel=0; channel<numchannels; channel++) {
+      if(db.programs[db.channels[channel].program].type == MANUAL) {
         server << sep << state[channel];
       }
       else {
@@ -1204,7 +1203,7 @@ void check_switches(bool init) {
 
   for(channel=0; channel<numswitches; channel++) {
     swpressed = digitalRead(switches[channel]);
-    if(swpressed && (manual || db.programs[db.channels[channel].program].type == MANUAL)) {
+    if(swpressed && (manual || db.programs[db.channels[channel].program].type == MANUAL)) {
       // remember how long the channel is already running
       if(db.programs[db.channels[channel].program].cooldown > 0) {
         if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
@@ -1275,7 +1274,7 @@ void check_timers(bool init) {
       t = gettimeofday();
       for(channel=0; channel<numchannels; channel++) {
         if(db.programs[db.channels[channel].program].type == MANUAL) {
-          break; 
+          continue; 
         }
         
 	runtime = operate(channel, t);
@@ -1301,7 +1300,7 @@ void check_timers(bool init) {
             }
           }
         }
- 
+
 	if(runtime != runstate[channel] || init) {
 	  if(runtime) {
 	    /* within operation time, turn the channel on */
