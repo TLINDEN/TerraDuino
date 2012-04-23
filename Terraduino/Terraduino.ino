@@ -807,7 +807,19 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       err_cooldown.copy(post.s1);
       error = 1;
     }
-    // FIXME: check sleep*
+    if(post.i10 < 1 || post.i10 > 31) {
+      err_sleepday.copy(post.s1);
+      error = 1;
+    }
+    if(post.i11 < 1 || post.i11 > 12) {
+      err_sleepmon.copy(post.s1);
+      error = 1;
+    }
+    if(post.i12 < 1 || post.i12 > 31) {
+      err_sleepincr.copy(post.s1);
+      error = 1;
+      inck
+    }
     
     if(! error) {
       Program p = db.programs[post.i1];
@@ -872,6 +884,29 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
   tpl_setair(server);
 }
 
+
+void www_rrd(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete) {
+  server.httpSuccess();
+  server << f_rrd << endl;
+  server temperature() << sep << humidity();
+  if(manual) {
+    for(channel=0; channel<maxswitches; channel++) {
+      server << sep << state[channel];
+    }
+    server << sep << 0;
+  }
+  else {
+    for(channel=0; channel<maxchannels; channel++) {
+      if(db.programs[db.channels[channel]].type == MANUAL) {
+        server << sep << state[channel];
+      }
+      else {
+        server << sep << operate(channel, t);
+      }
+    }
+  }
+  server << endl;
+}
 
 /*
  * Helper functions
@@ -1169,7 +1204,7 @@ void check_switches(bool init) {
 
   for(channel=0; channel<numswitches; channel++) {
     swpressed = digitalRead(switches[channel]);
-    if(swpressed && (manual ||Â db.programs[db.channels[channel].program].type == MANUAL)) {
+    if(swpressed && (manual || db.programs[db.channels[channel].program].type == MANUAL)) {
       // remember how long the channel is already running
       if(db.programs[db.channels[channel].program].cooldown > 0) {
         if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
@@ -1518,7 +1553,6 @@ void sh_ip(char parameter[MAXBYTES]) {
       S.octet4 = value[3];
       ee_wr_settings(S);
       db = ee_getdb();
-      // FIXME: maybe doesn't work this way, eventually reboot instead, check this!
       uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
       Ethernet.begin(mac, ip);
       Serial << f_sht_ipsav << value[0] << '.' << value[1] << '.' << value[2] << '.' << value[3] << endl;
@@ -1966,6 +2000,7 @@ void setup() {
   webserver.addCommand("programs.html",   &www_programs);
   webserver.addCommand("editprogram.html",&www_editprogram);
   webserver.addCommand("air.html",        &www_air);
+  webserver.addCommand("rrd.html",        &www_rrd);
   webserver.begin();
 
 

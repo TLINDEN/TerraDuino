@@ -1,3 +1,9 @@
+FLASH_STRING(hfoot,
+	     "<hr>"
+	     "<p>powered by <a href=\"https://github.com/TLINDEN/TerraDuino\">TerraDuino v1.00</a></p>"
+	     "</body>"
+	     "</html>");
+
 FLASH_STRING(f_failed_dht, "Failed to read from DHT");
 
 FLASH_STRING(f_sht_temp, "Temperature: ");
@@ -128,11 +134,6 @@ FLASH_STRING(hmenu,
 	     "<a href=\"programs.html\">Programme</a>"
 	     "</p>");
 
-FLASH_STRING(hfoot,
-	     "<hr>"
-	     "<p>powered by <a href=\"https://github.com/TLINDEN/TerraDuino\">TerraDuino</a></p>"
-	     "</body>"
-	     "</html>");
 
 FLASH_STRING(ch1, "<h4>&Uuml;bersicht</h4>");
 FLASH_STRING(chc, "<h4>Steuerkan&auml;le</h4>");
@@ -323,3 +324,9 @@ FLASH_STRING(err_sec, "Fehler: Sekunde ! 0-59");
 FLASH_STRING(err_day, "Fehler: Tag ! 1-31");
 FLASH_STRING(err_mon, "Fehler: Monat ! 1-12");
 FLASH_STRING(err_yea, "Fehler: Jahr ! 2010-3600");
+
+FLASH_STRING(f_rrd, "# Temp, Humidity, Channel1-7 OpMode");
+FLASH_STRING(sep, ", ");
+FLASH_STRING(err_sleepday,"Fehler: Start Winterruhe Tag ! 1-31!");
+FLASH_STRING(err_sleepmon, "Fehler: Start Winterruhe Monat ! 1-12!");
+FLASH_STRING(err_sleepincr, "Fehler: Inkrement ! 0-65536!");
