@@ -30,4 +30,4 @@ Features:
 * alles einstellbar ueber ein Webinterface
 * alles einstellbar ueber die serielle Console
 
-Project Home: http://play.daemon.de/2012/04/07/25/terraduino/
+Project Home: http://www.daemon.de/TerraDuino
