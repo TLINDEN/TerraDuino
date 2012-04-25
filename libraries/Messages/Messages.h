@@ -330,3 +330,4 @@ FLASH_STRING(sep, ", ");
 FLASH_STRING(err_sleepday,"Fehler: Start Winterruhe Tag ! 1-31!");
 FLASH_STRING(err_sleepmon, "Fehler: Start Winterruhe Monat ! 1-12!");
 FLASH_STRING(err_sleepincr, "Fehler: Inkrement ! 0-65536!");
+FLASH_STRING(lastboot, "Letzer Reboot: ");

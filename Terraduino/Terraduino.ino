@@ -52,10 +52,12 @@
 #define NOTE_G 1275
 #define PINON  'X'
 #define PINOFF '-'
-
+#define MAXUP 20000000
 
 /* global vars */
 time_t t;
+time_t booted;
+long uptime = 0;
 int startdelay;
 int stopdelay;
 static uint8_t mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -297,6 +299,10 @@ void tpl_index(WebServer &server) {
     server << airinactive;
   }
   server << tde << tre;
+  
+  server << tra << tdr << lastboot << tde << td << N(day(booted)) << '.' << N(month(booted)) << '.' << year(booted);
+  server << ' ' << N(hour(booted)) << ':' << N(minute(booted)) << ':' << N(second(booted)) << f_shc_clock << tde << tre;
+  
   server << tablee << hfoot;
 }
 
@@ -904,7 +910,10 @@ void www_rrd(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
       }
     }
   }
+  server << sep << freeMemory();
+  server << sep << uptime;
   server << endl;
+  delay(100);
 }
 
 /*
@@ -1322,6 +1331,11 @@ void check_timers(bool init) {
 	}
       }
       timer = moment;
+    
+      // log uptime
+      if(uptime < MAXUP) {
+        uptime++;
+      }
     }
   }
 }
@@ -2008,6 +2022,8 @@ void setup() {
   beep();
   Serial << f_mem <<  freeMemory() << endl;
   Serial << f_prompt;
+  
+  booted = gettimeofday();
 }
 
 
