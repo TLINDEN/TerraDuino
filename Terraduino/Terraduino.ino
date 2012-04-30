@@ -259,14 +259,19 @@ void tpl_index(WebServer &server) {
     else {
       server << f_shc_ast << ' ';
       int B = begin + db.programs[db.channels[channel].program].start_delay + elapsed_sleep_days(t, channel);
-      int E = end   - db.programs[db.channels[channel].program].stop_delay  + elapsed_sleep_days(t, channel);
-      server << N((B - (B % 60)) / 60); // start hour
-      server << ':';
-      server << N(B % 60); // stop hour
-      server << f_shc_clock << bis;
-      server << N((E - (E % 60)) / 60); // start hour
-      server << ':';
-      server << N(E % 60) << f_shc_clock; // stop hour
+      int E = end   - (db.programs[db.channels[channel].program].stop_delay  + elapsed_sleep_days(t, channel));
+      if(B > E) {
+        server << N(0) << ':' << N(0) << f_shc_clock << bis << N(0) << ':' << N(0) << f_shc_clock;
+      }
+      else {
+        server << N((B - (B % 60)) / 60); // start hour
+        server << ':';
+        server << N(B % 60);
+        server << f_shc_clock << bis;
+        server << N((E - (E % 60)) / 60); // stop hour
+        server << ':';
+        server << N(E % 60) << f_shc_clock;
+      }
     }
     if(db.programs[db.channels[channel].program].type != MANUAL) {
       if( db.programs[db.channels[channel].program].cooldown > 0 ) {
@@ -813,17 +818,25 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       err_cooldown.copy(post.s1);
       error = 1;
     }
-    if(post.i10 < 1 || post.i10 > 31) {
-      err_sleepday.copy(post.s1);
-      error = 1;
+    if(post.i10 > 0 && post.i11 > 0) {
+      if(post.i10 < 1 || post.i10 > 31) {
+        err_sleepday.copy(post.s1);
+        error = 1;
+      }
+      if(post.i11 < 1 || post.i11 > 12) {
+        err_sleepmon.copy(post.s1);
+        error = 1;
+      }
+      if(post.i12 < 1 || post.i12 > 120) {
+        err_sleepincr.copy(post.s1);
+        error = 1;
+      }
     }
-    if(post.i11 < 1 || post.i11 > 12) {
-      err_sleepmon.copy(post.s1);
-      error = 1;
-    }
-    if(post.i12 < 1 || post.i12 > 31) {
-      err_sleepincr.copy(post.s1);
-      error = 1;
+    else {
+     // sanitize sleep day data
+     post.i10 = 0;
+     post.i11 = 0;
+     post.i12 = 0; 
     }
     
     if(! error) {
@@ -954,7 +967,7 @@ int getdayofyear(uint8_t T, uint8_t M, int Y) {
     return -1;
   }
 
-  uint8_t LT = T;
+  int     LT = T;
   uint8_t LM = M;
 
   while (LM > 1) {
@@ -965,14 +978,17 @@ int getdayofyear(uint8_t T, uint8_t M, int Y) {
   return LT;
 }  
 
-uint8_t elapsed_sleep_days(time_t t, uint8_t channel) {
- /* check if we are within sleep time and if yes, return the number of minutes
+int elapsed_sleep_days(time_t t, uint8_t channel) {
+ /*
+  * check if we are within sleep time and if yes, return the number of minutes
   * to add to *_delay
   */
  if(db.programs[db.channels[channel].program].sleep_day > 0 && db.programs[db.channels[channel].program].sleep_mon > 0) {
    // ok, sleep time enabled
    int cur_day = getdayofyear(day(t), month(t), year(t));
    int con_day = getdayofyear(db.programs[db.channels[channel].program].sleep_day, db.programs[db.channels[channel].program].sleep_mon, year(t));
+   //Serial << channel << ": cur: " << cur_day << ", con: " << con_day << ", ";
+   //Serial << db.programs[db.channels[channel].program].sleep_day << ", " << db.programs[db.channels[channel].program].sleep_mon << ", " << year(t) << endl;
    if(cur_day >= con_day) {
      // ok, sleep date is earlier than current date
      return (cur_day - con_day) * db.programs[db.channels[channel].program].sleep_increment;
