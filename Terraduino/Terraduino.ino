@@ -31,7 +31,11 @@
 #include "Ethernet.h"
 #include "WebServer.h"
 
+/* atoi ... */
 #include <stdio.h>
+
+/* watchdog (http://tushev.org/articles/electronics/48-arduino-and-watchdog-timer) */
+#include <avr/wdt.h>
 
 /* defines */
 #define SUNRISE 0
@@ -52,38 +56,38 @@
 #define NOTE_G 1275
 #define PINON  'X'
 #define PINOFF '-'
-#define MAXUP 20000000
+#define MAXUP 200000
 
 /* global vars */
-time_t t;
-time_t booted;
+time_t t = 0;
+time_t booted = 0;
 long uptime = 0;
-int startdelay;
-int stopdelay;
+int startdelay = 0;
+int stopdelay = 0;
 static uint8_t mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-char endl = '\n';
+const char endl = '\n';
 bool manual = false;
 uint8_t mainstatus = 0;
 uint8_t pressed    = 0;
 uint8_t swpressed  = 0;
-long timerintervall = 500;
-long timer;
-long moment;
-long sttimer;
-long stmoment;
-long airtimerinterval = 72000; // 10 min
-long airtimer;
-long airmoment;
-bool airon;
+long timer = 0;
+long moment = 0;
+long sttimer = 0;
+long stmoment = 0;
+long airtimer = 0;
+long airmoment = 0;
+bool airon = false;
+long alarmpaused = 0;
 
-long alarmpaused;
-int alarmwait = 120; // min, 2 hours
+const int alarmwait = 120; // min, 2 hours
+const long timerintervall = 5000; //orig: 500;
+const long airtimerinterval = 72000; // 10 min
 
-uint8_t channel;
-uint8_t program;
+uint8_t channel = 0;
+uint8_t program = 0;
 bool INIT = true;
 bool RUN  = false;
-uint8_t runtime;
+uint8_t runtime = 0;
 long cooldown[] = {0, 0, 0, 0, 0, 0};
 int begin = 0;
 int end = 0;
@@ -94,8 +98,8 @@ uint8_t nvalue = 0;
 char    buffer[5];
 byte    idx = 0;
     
-uint8_t onebyte;
-uint8_t command;
+uint8_t onebyte = 0;
+uint8_t command = 0;
 char parameter[MAXBYTES];
 byte index = 0;
 bool parametermode = false;
@@ -114,20 +118,23 @@ bool parsing = true;
 const uint8_t switches[] = { 15, 49, 47, 45, 43, 41 };
 const uint8_t leds[]     = { 16, 48, 46, 44, 42, 40 };
 const uint8_t relays[]   = { 36, 34, 32, 30, 28, 26, 22 };
-uint8_t state[]          =  { 0, 0, 0, 0, 0, 0 };
-uint8_t runstate[]       =  { 0, 0, 0, 0, 0, 0 };
-String names[] = { "70 W Links", "70 W Rechts", "40 W Vorn", "40 W Hinten", "15 W Links", "15 W Rechts", "Reserve"};
+uint8_t state[]          = { 0, 0, 0, 0, 0, 0 };
+uint8_t runstate[]       = { 0, 0, 0, 0, 0, 0 };
+
+/* names for the channels */
+const String names[7] = { "70 W Links", "70 W Rechts", "40 W Vorn", "40 W Hinten", "15 W Links", "15 W Rechts", "Reserve"};
+
 const uint8_t air        = 24;
 const uint8_t statusled  = 27;
 const uint8_t speaker    = 17;
 const uint8_t mainswitch = 19;
 const uint8_t mainled    = 18;
 
-uint8_t numchannels = 7;
-uint8_t numswitches = 6;
+const uint8_t numchannels = 7;
+const uint8_t numswitches = 6;
 uint8_t i = 0;
 
-uint8_t dayspermonth[] = {  0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+const uint8_t dayspermonth[] = {  0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
 /* global objects */
 DHT dht(DHTPIN, DHTTYPE);
@@ -1983,7 +1990,7 @@ void setup() {
   db = ee_getdb();
   Serial << "    got db version ";
   Serial << db.header.version << endl;
-
+  
   blink();
   Serial << "init speaker and air" << endl;
   pinMode(speaker,    OUTPUT); 
@@ -1991,13 +1998,14 @@ void setup() {
   digitalWrite(air, HIGH);
   delay(5);
   check_air(INIT);
-
+  
   blink();
   Serial << "init main switch" << endl;
   pinMode(mainswitch, INPUT);
   pinMode(mainled,    OUTPUT);
-  check_main(INIT);
 
+  check_main(INIT);
+  
   Serial << "init switches ";
   for(channel=0; channel<numswitches; channel++) {
     blink();
@@ -2010,7 +2018,7 @@ void setup() {
     pinMode(relays[channel],   OUTPUT);
   }
   Serial << endl;
-  
+
   blink();
   Serial << "init timers" << endl;
   check_timers(INIT);
@@ -2032,7 +2040,6 @@ void setup() {
   webserver.addCommand("rrd.html",        &www_rrd);
   webserver.begin();
 
-
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
   beep();
@@ -2040,14 +2047,18 @@ void setup() {
   Serial << f_prompt;
   
   booted = gettimeofday();
+  
+  /* finally enable watchdog and set PAT timetimeout */
+  wdt_enable(WDTO_4S);
 }
 
 
 void loop() {
   check_main(RUN);
   check_switches(RUN);
-  check_timers(RUN);
+  //check_timers(RUN);
   check_air(RUN);
   check_shell();
   webserver.processConnection();
+  wdt_reset();
 }

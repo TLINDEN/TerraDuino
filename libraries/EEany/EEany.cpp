@@ -69,6 +69,11 @@ unsigned int ee_init(bool force) {
     db.programs[pid].sleep_increment = 0;
   }
 
+  /* before writing to eeprom, erase it */
+  for(int i=0; i<sizeof(db); i++) {
+    EEPROM.write(i, 0);
+  }
+
   written = EEPROM_writeAnything(0, db);
 
   return written;
