@@ -325,7 +325,7 @@ FLASH_STRING(err_day, "Fehler: Tag ! 1-31");
 FLASH_STRING(err_mon, "Fehler: Monat ! 1-12");
 FLASH_STRING(err_yea, "Fehler: Jahr ! 2010-3600");
 
-FLASH_STRING(f_rrd, "# Temp, Humidity, Channel1-7 OpMode");
+FLASH_STRING(f_rrd, "# Temp, Humidity, Channel1-7 OpMode Uptime");
 FLASH_STRING(sep, ", ");
 FLASH_STRING(err_sleepday,"Fehler: Start Winterruhe Tag ! 1-31!");
 FLASH_STRING(err_sleepmon, "Fehler: Start Winterruhe Monat ! 1-12!");

@@ -56,7 +56,7 @@
 #define NOTE_G 1275
 #define PINON  'X'
 #define PINOFF '-'
-#define MAXUP 200000
+#define MAXUP 86400 // after 1 day uptime keep the value
 
 /* global vars */
 time_t t = 0;
@@ -2056,7 +2056,7 @@ void setup() {
 void loop() {
   check_main(RUN);
   check_switches(RUN);
-  //check_timers(RUN);
+  check_timers(RUN);
   check_air(RUN);
   check_shell();
   webserver.processConnection();
