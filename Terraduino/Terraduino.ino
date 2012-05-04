@@ -107,7 +107,7 @@ bool parametermode = false;
 /* important for EEany initialization */
 int maxchannels = 8;
 int maxprograms = 32;
-int dbversion   = 1000;
+int dbversion   = 1001;
 
 /* post parser vars */
 char parsename[32];
@@ -464,6 +464,11 @@ void tpl_setip(WebServer &server) {
   server << spf3 << 1 << sdfv << db.settings.octet2 << sdfe << '.';
   server << spf3 << 2 << sdfv << db.settings.octet3 << sdfe << '.';
   server << spf3 << 3 << sdfv << db.settings.octet4 << sdfe;
+  server << ipgw;
+  server << spf3 << 4 << sdfv << db.settings.gw1 << sdfe << '.';
+  server << spf3 << 5 << sdfv << db.settings.gw2 << sdfe << '.';
+  server << spf3 << 6 << sdfv << db.settings.gw3 << sdfe << '.';
+  server << spf3 << 7 << sdfv << db.settings.gw4 << sdfe;
   server << br << submit << forme << hfoot;
 }
 
@@ -665,9 +670,13 @@ void www_setip(WebServer &server, WebServer::ConnectionType type, char *, bool) 
       if (strcmp(parsename, "1") == 0){post.i2 = atoi(parsevalue);}
       if (strcmp(parsename, "2") == 0){post.i3 = atoi(parsevalue);}
       if (strcmp(parsename, "3") == 0){post.i4 = atoi(parsevalue);}
+      if (strcmp(parsename, "4") == 0){post.i5 = atoi(parsevalue);}
+      if (strcmp(parsename, "5") == 0){post.i6 = atoi(parsevalue);}
+      if (strcmp(parsename, "6") == 0){post.i7 = atoi(parsevalue);}
+      if (strcmp(parsename, "7") == 0){post.i8 = atoi(parsevalue);}
     }
 
-    if(post.i1 < 1 || post.i1 > 255 ||Â post.i2 > 255 ||Â post.i3 > 255 ||Â post.i4 > 255) {
+    if(post.i1 < 1 || post.i1 > 255 || post.i2 > 255 || post.i3 > 255 || post.i4 > 255 || post.i5 < 1 || post.i5 > 255 || post.i6 > 255 || post.i7 > 255 || post.i8 > 255) {
       err_ip.copy(post.s1);
       tpl_setip(server);
       return;
@@ -678,6 +687,10 @@ void www_setip(WebServer &server, WebServer::ConnectionType type, char *, bool) 
     S.octet2 = post.i2;
     S.octet3 = post.i3;
     S.octet4 = post.i4;
+    S.gw1    = post.i5;
+    S.gw2    = post.i6;
+    S.gw3    = post.i7;
+    S.gw4    = post.i8;
     ee_wr_settings(S);
     ipdone.copy(post.s1);
     db = ee_getdb();
@@ -1599,6 +1612,8 @@ void sh_ip(char parameter[MAXBYTES]) {
   else {
     Serial << f_ship << db.settings.octet1 << '.' << db.settings.octet2 << '.';
     Serial << db.settings.octet3 << '.' << db.settings.octet4 << endl;
+    Serial << ipgw << db.settings.gw1 << '.' << db.settings.gw2 << '.';
+    Serial << db.settings.gw3 << '.' << db.settings.gw4 << endl;
   }
 }
 
@@ -2025,7 +2040,8 @@ void setup() {
 
   blink();
   uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
-  Ethernet.begin(mac, ip);
+  uint8_t gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
+  Ethernet.begin(mac, ip, gw);
 
   blink();
   webserver.setDefaultCommand(&www_home);

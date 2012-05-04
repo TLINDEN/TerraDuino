@@ -1,6 +1,6 @@
 FLASH_STRING(hfoot,
 	     "<hr>"
-	     "<p>powered by <a href=\"https://github.com/TLINDEN/TerraDuino\">TerraDuino v1.00</a></p>"
+	     "<p>powered by <a href=\"https://github.com/TLINDEN/TerraDuino\">TerraDuino v1.01</a></p>"
 	     "</body>"
 	     "</html>");
 
@@ -304,6 +304,7 @@ FLASH_STRING(progdone, "Programm wurde gespeichert");
 FLASH_STRING(ipform,
 	     "<form name=\"setip\" action=\"setip.html\" method=\"POST\">"
 	     "IP Adresse: ");
+FLASH_STRING(ipgw, " Default Gateway:");
 FLASH_STRING(spf3,
 	     "<input type=\"text\" size=\"3\" maxlength=\"3\" name=\"");
 FLASH_STRING(ipdone, "Neue IP Adresse eingestellt");

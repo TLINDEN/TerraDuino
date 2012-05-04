@@ -39,10 +39,14 @@ unsigned int ee_init(bool force) {
   db.settings.air_tmin  = 0;
   db.settings.air_alarm = 0;
   db.settings.i4  = 0;
-  db.settings.octet1 = 10;
-  db.settings.octet2 = 0;
-  db.settings.octet3 = 0;
-  db.settings.octet4 = 1;
+  db.settings.octet1 = 192;
+  db.settings.octet2 = 168;
+  db.settings.octet3 = 128;
+  db.settings.octet4 = 250;
+  db.settings.gw1 = 192;
+  db.settings.gw2 = 168;
+  db.settings.gw3 = 128;
+  db.settings.gw4 = 1;
 
   for (int cid=0; cid<maxchannels; cid++) {
     db.channels[cid].id      = cid;
@@ -56,7 +60,7 @@ unsigned int ee_init(bool force) {
 
   for (int pid=0; pid<maxprograms; pid++) {
     db.programs[pid].id = pid;
-    db.programs[pid].type = 1;
+    db.programs[pid].type = 0;
     db.programs[pid].start_delay = 0;
     db.programs[pid].stop_delay = 0;
     db.programs[pid].start_hour = 0;

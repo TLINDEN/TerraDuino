@@ -37,6 +37,10 @@ struct Settings {
   uint8_t octet2;
   uint8_t octet3;
   uint8_t octet4;
+  uint8_t gw1;
+  uint8_t gw2;
+  uint8_t gw3;
+  uint8_t gw4;
   int  air_tmin;
   int  air_tmax;
   int  air_alarm;
