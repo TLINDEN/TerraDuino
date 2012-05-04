@@ -79,8 +79,8 @@ FLASH_STRING(f_sht_ipsav, "IP address successfully changed to ");
 FLASH_STRING(f_sht_tmpsav, "Air condition successfully set to ");
 FLASH_STRING(f_sht_airoff, "Air condition successfully turned OFF");
 
-FLASH_STRING(f_rtc_ok, "RTC has set the system time");
-FLASH_STRING(f_rtc_fail, "Unable to sync with the RTC");
+FLASH_STRING(f_rtc_ok, "DS1307 RTC clock")
+FLASH_STRING(f_rtc_fail, "Unable to sync with the DS1307 RTC");
 
 FLASH_STRING(f_shc_cn, "Channel #");
 FLASH_STRING(f_shc_pn, "Program #");
@@ -101,7 +101,7 @@ FLASH_STRING(f_shc_clock, " Uhr");
 FLASH_STRING(f_shc_delay, " Einschalt Verzoegerung: ");
 FLASH_STRING(f_shc_man, "Manuell");
 
-FLASH_STRING(f_prompt, "> ");
+FLASH_STRING(f_prompt, "enter command (h for help)> ");
 
 FLASH_STRING(f_ship, "Current ip address: ");
 FLASH_STRING(f_mem, "Free memory: ");
@@ -332,3 +332,21 @@ FLASH_STRING(err_sleepday,"Fehler: Start Winterruhe Tag ! 1-31!");
 FLASH_STRING(err_sleepmon, "Fehler: Start Winterruhe Monat ! 1-12!");
 FLASH_STRING(err_sleepincr, "Fehler: Inkrement ! 0-120!");
 FLASH_STRING(lastboot, "Letzer Reboot: ");
+
+FLASH_STRING(init_dberror, "  DB version does not match! Re-initializing DB, Existing settings will be overwritten!");
+FLASH_STRING(init, "Initializing ");
+FLASH_STRING(init_dht, "DHT22 Temperature and Humidity sensor");
+FLASH_STRING(init_wire, "Wire SPI/ISP communication protocol");
+FLASH_STRING(init_eep, "EEProm");
+FLASH_STRING(init_dbread, "  Reading DB from EEProm");
+FLASH_STRING(init_dbok, "  Fetched matching DB from EEprom with version ");
+FLASH_STRING(init_speak, "PC 8ohm speaker");
+FLASH_STRING(init_air, "Relay channel 8 air fan");
+FLASH_STRING(init_sw, "Switches");
+FLASH_STRING(init_relay, "220V/1A relays ");
+FLASH_STRING(init_ok, " ok");
+FLASH_STRING(init_timers, "Program timers");
+FLASH_STRING(init_eth, "Ethernet Wiznet W5100 with ip address ");
+FLASH_STRING(init_www, "Webserver on tcp port 80");
+FLASH_STRING(init_wdt, "Watchdog timer to ");
+FLASH_STRING(init_done, "Startup complete");
