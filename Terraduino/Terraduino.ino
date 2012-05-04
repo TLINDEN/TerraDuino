@@ -677,7 +677,7 @@ void www_setip(WebServer &server, WebServer::ConnectionType type, char *, bool) 
       if (strcmp(parsename, "7") == 0){post.i8 = atoi(parsevalue);}
     }
 
-    if(post.i1 < 1 || post.i1 > 255 || post.i2 > 255 || post.i3 > 255 || post.i4 > 255 || post.i5 < 1 || post.i5 > 255 || post.i6 > 255 || post.i7 > 255 || post.i8 > 255) {
+    if(post.i1 < 1 || post.i1 > 255 || post.i2 > 255 || post.i3 > 255 || post.i4 > 255 || post.i5 < 1 || post.i5 > 255 || post.i6 > 255 || post.i7 > 255 || post.i8 > 255) {
       err_ip.copy(post.s1);
       tpl_setip(server);
       return;
@@ -1985,49 +1985,49 @@ void setup() {
   if(timeStatus()!= timeSet) 
      Serial << f_rtc_fail << endl;
   else
-     Serial << init << f_rtc_ok << endl;
+     Serial << f_init << f_rtc_ok << endl;
 
   t = now();
   
   blink();
-  Serial << init << init_dht << endl;
+  Serial << f_init << f_init_dht << endl;
   dht.begin();
 
   blink();
-  Serial << init << init_wire << endl;
+  Serial << f_init << f_init_wire << endl;
   Wire.begin();
 
   blink();
-  Serial << init << init_eep << endl;
+  Serial << f_init << f_init_eep << endl;
   ee_init(RUN);
   
   blink();
-  Serial << init_dbread << endl;
+  Serial << f_init_dbread << endl;
   db = ee_getdb();
 
   if(dbversion > db.header.version) {
     alarm();
-    Serial << init_dberror << endl;
+    Serial << f_init_dberror << endl;
     ee_init(INIT);
     db = ee_getdb();    
   }
   else {
-    Serial << init_dbok db.header.version << endl;
+    Serial << f_init_dbok << db.header.version << endl;
   }
   
   blink();
-  Serial << init << init_speak << endl;
+  Serial << f_init << f_init_speak << endl;
   pinMode(speaker,    OUTPUT); 
 
   blink();
-  Serial << init << init_air << endl;
+  Serial << f_init << f_init_air << endl;
   pinMode(air,        OUTPUT);
   digitalWrite(air, HIGH);
   delay(5);
   check_air(INIT);
   
   blink();
-  Serial << init << init_sw << endl;
+  Serial << f_init << f_init_sw << endl;
   pinMode(mainswitch, INPUT);
   pinMode(mainled,    OUTPUT);
 
@@ -2041,25 +2041,25 @@ void setup() {
   }
  
   blink();
-  Serial << init << init_relay; 
+  Serial << f_init << f_init_relay; 
   for(channel=0; channel<numchannels; channel++) {
     pinMode(relays[channel],   OUTPUT);
     Serial << channel << ' ';
   }
-  Serial << init_ok << endl;
+  Serial << f_init_ok << endl;
 
   blink();
-  Serial << init << init_timers << endl;
+  Serial << f_init << f_init_timers << endl;
   check_timers(INIT);
 
   blink();
-  Serial << init << init_eth << db.settings.octet1 << '.' << db.settings.octet2 << '.' << db.settings.octet3 << '.' << db.settings.octet4 << endl;
+  Serial << f_init << f_init_eth << db.settings.octet1 << '.' << db.settings.octet2 << '.' << db.settings.octet3 << '.' << db.settings.octet4 << endl;
   uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
   uint8_t gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
   Ethernet.begin(mac, ip, gw);
 
   blink();
-  Serial << init << init_www << endl;
+  Serial << f_init << f_init_www << endl;
   webserver.setDefaultCommand(&www_home);
   webserver.setFailureCommand(&www_home);
   webserver.addCommand("channels.html",   &www_channels);
@@ -2075,13 +2075,13 @@ void setup() {
   
   /* finally enable watchdog and set PAT timeout */
   blink();
-  Serial << init << init_wdt << WDTO_4S << 's' << endl;
+  Serial << f_init << f_init_wdt << WDTO_4S << 's' << endl;
   wdt_enable(WDTO_4S);
 
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
   beep();
-  Serial << f_mem <<  freeMemory() << endl << init_done << endl << endl;
+  Serial << f_mem <<  freeMemory() << endl << f_init_done << endl << endl;
   Serial << f_prompt;
   
   booted = gettimeofday();
