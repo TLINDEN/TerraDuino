@@ -1173,7 +1173,7 @@ void blink() {
     digitalWrite(statusled, HIGH);
     delay(10);
     digitalWrite(statusled, LOW);
-    delay(20);
+    delay(50);
   }
 }
 
@@ -1984,66 +1984,81 @@ void setup() {
   if(timeStatus()!= timeSet) 
      Serial << f_rtc_fail << endl;
   else
-     Serial << f_rtc_ok << endl;
+     Serial << init << f_rtc_ok << endl;
 
   t = now();
   
   blink();
-  Serial << "init DHT22" << endl;
+  Serial << init << init_dht << endl;
   dht.begin();
 
   blink();
-  Serial << "init Wire" << endl;
+  Serial << init << init_wire << endl;
   Wire.begin();
 
   blink();
-  Serial << "init eeprom" << endl;
+  Serial << init << init_eep << endl;
   ee_init(RUN);
   
   blink();
-  Serial << "read db from eeprom";
+  Serial << init_dbread << endl;
   db = ee_getdb();
-  Serial << "    got db version ";
-  Serial << db.header.version << endl;
+
+  if(dbversion > db.header.version) {
+    alarm();
+    Serial << init_dberror << endl;
+    ee_init(INIT);
+    db = ee_getdb();    
+  }
+  else {
+    Serial << init_dbok db.header.version << endl;
+  }
   
   blink();
-  Serial << "init speaker and air" << endl;
+  Serial << init << init_speak << endl;
   pinMode(speaker,    OUTPUT); 
+
+  blink();
+  Serial << init << init_air << endl;
   pinMode(air,        OUTPUT);
   digitalWrite(air, HIGH);
   delay(5);
   check_air(INIT);
   
   blink();
-  Serial << "init main switch" << endl;
+  Serial << init << init_sw << endl;
   pinMode(mainswitch, INPUT);
   pinMode(mainled,    OUTPUT);
 
   check_main(INIT);
   
-  Serial << "init switches ";
   for(channel=0; channel<numswitches; channel++) {
     blink();
     Serial << channel;
     pinMode(switches[channel], INPUT);
     pinMode(leds[channel],     OUTPUT);
   }
-  
+ 
+  blink();
+  Serial << init << init_relay; 
   for(channel=0; channel<numchannels; channel++) {
     pinMode(relays[channel],   OUTPUT);
+    Serial << channel << ' ';
   }
-  Serial << endl;
+  Serial << init_ok << endl;
 
   blink();
-  Serial << "init timers" << endl;
+  Serial << init << init_timers << endl;
   check_timers(INIT);
 
   blink();
+  Serial << init << init_eth << db.settings.octet1 << '.' << db.settings.octet2 << '.' << db.settings.octet3 << '.' << db.settings.octet4 << endl;
   uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
   uint8_t gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
   Ethernet.begin(mac, ip, gw);
 
   blink();
+  Serial << init << init_www << endl;
   webserver.setDefaultCommand(&www_home);
   webserver.setFailureCommand(&www_home);
   webserver.addCommand("channels.html",   &www_channels);
@@ -2056,16 +2071,19 @@ void setup() {
   webserver.addCommand("rrd.html",        &www_rrd);
   webserver.begin();
 
+  
+  /* finally enable watchdog and set PAT timeout */
+  blink();
+  Serial << init << init_wdt << WDTO_4S << 's' << endl;
+  wdt_enable(WDTO_4S);
+
   /* booting done, keep status on */
   digitalWrite(statusled, HIGH);
   beep();
-  Serial << f_mem <<  freeMemory() << endl;
+  Serial << f_mem <<  freeMemory() << endl << init_done << endl << endl;
   Serial << f_prompt;
   
   booted = gettimeofday();
-  
-  /* finally enable watchdog and set PAT timetimeout */
-  wdt_enable(WDTO_4S);
 }
 
 
