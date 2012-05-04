@@ -79,8 +79,8 @@ long airmoment = 0;
 bool airon = false;
 long alarmpaused = 0;
 
-const int alarmwait = 120; // min, 2 hours
-const long timerintervall = 5000; //orig: 500;
+const int alarmwait         = 120; // min, 2 hours
+const long timerintervall   = 5000; //orig: 500;
 const long airtimerinterval = 72000; // 10 min
 
 uint8_t channel = 0;
@@ -93,14 +93,15 @@ int begin = 0;
 int end = 0;
 
 // serial parser vars
-int     value[4];
+int     value[4] = { 0 };
 uint8_t nvalue = 0;
-char    buffer[5];
+char    buffer[5] = { 0 };
 byte    idx = 0;
+
     
 uint8_t onebyte = 0;
 uint8_t command = 0;
-char parameter[MAXBYTES];
+char parameter[MAXBYTES] = { 0 };
 byte index = 0;
 bool parametermode = false;
 
@@ -110,8 +111,8 @@ int maxprograms = 32;
 int dbversion   = 1001;
 
 /* post parser vars */
-char parsename[32];
-char parsevalue[32];
+char parsename[32] = { 0 };
+char parsevalue[32] = { 0 };
 bool parsing = true;
 
 /* PINs */
