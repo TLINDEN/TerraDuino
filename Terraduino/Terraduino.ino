@@ -93,15 +93,15 @@ int begin = 0;
 int end = 0;
 
 // serial parser vars
-int     value[4] = { 0 };
+int     value[4];
 uint8_t nvalue = 0;
-char    buffer[5] = { 0 };
+char    buffer[5];
 byte    idx = 0;
 
     
 uint8_t onebyte = 0;
 uint8_t command = 0;
-char parameter[MAXBYTES] = { 0 };
+char parameter[MAXBYTES];
 byte index = 0;
 bool parametermode = false;
 
@@ -111,8 +111,8 @@ int maxprograms = 32;
 int dbversion   = 1001;
 
 /* post parser vars */
-char parsename[32] = { 0 };
-char parsevalue[32] = { 0 };
+char parsename[32];
+char parsevalue[32];
 bool parsing = true;
 
 /* PINs */
@@ -2027,7 +2027,7 @@ void setup() {
   check_air(INIT);
   
   blink();
-  Serial << f_init << f_init_sw << endl;
+  Serial << f_init << f_init_sw << "M ";
   pinMode(mainswitch, INPUT);
   pinMode(mainled,    OUTPUT);
 
@@ -2035,10 +2035,11 @@ void setup() {
   
   for(channel=0; channel<numswitches; channel++) {
     blink();
-    Serial << channel;
+    Serial << channel << ' ';
     pinMode(switches[channel], INPUT);
     pinMode(leds[channel],     OUTPUT);
   }
+  Serial << endl;
  
   blink();
   Serial << f_init << f_init_relay; 
@@ -2056,7 +2057,8 @@ void setup() {
   Serial << f_init << f_init_eth << db.settings.octet1 << '.' << db.settings.octet2 << '.' << db.settings.octet3 << '.' << db.settings.octet4 << endl;
   uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
   uint8_t gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
-  Ethernet.begin(mac, ip, gw);
+  uint8_t net[]= { 255, 255, 255, 0 };
+  Ethernet.begin(mac, ip, gw, net);
 
   blink();
   Serial << f_init << f_init_www << endl;
