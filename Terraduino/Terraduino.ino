@@ -89,6 +89,7 @@ bool INIT = true;
 bool RUN  = false;
 uint8_t runtime = 0;
 long cooldown[] = {0, 0, 0, 0, 0, 0};
+long dbcooldown[] = {0, 0, 0, 0, 0, 0};
 int begin = 0;
 int end = 0;
 
@@ -104,6 +105,7 @@ uint8_t command = 0;
 char parameter[MAXBYTES];
 byte index = 0;
 bool parametermode = false;
+char digits[3];
 
 /* important for EEany initialization */
 int maxchannels = 8;
@@ -123,7 +125,7 @@ uint8_t state[]          = { 0, 0, 0, 0, 0, 0 };
 uint8_t runstate[]       = { 0, 0, 0, 0, 0, 0 };
 
 /* names for the channels */
-const String names[7] = { "70 W Links", "70 W Rechts", "40 W Vorn", "40 W Hinten", "15 W Links", "15 W Rechts", "Reserve"};
+const char* names[] = { "70 W Links", "70 W Rechts", "40 W Vorn", "40 W Hinten", "15 W Links", "15 W Rechts", "Reserve"};
 
 const uint8_t air        = 24;
 const uint8_t statusled  = 27;
@@ -238,7 +240,7 @@ void tpl_index(WebServer &server) {
   server << tablesm;
   for (channel=0; channel<numchannels; channel++) {
     server << tra << td << chlinkl << channel << chlinkr << names[channel] << chlinke << ':' << tde << td;
-    if(manual ||Â db.programs[db.channels[channel].program].type == MANUAL) {
+    if(manual || db.programs[db.channels[channel].program].type == MANUAL) {
       if(state[channel] == HIGH) {
         server << irun;
       }
@@ -282,9 +284,9 @@ void tpl_index(WebServer &server) {
       }
     }
     if(db.programs[db.channels[channel].program].type != MANUAL) {
-      if( db.programs[db.channels[channel].program].cooldown > 0 ) {
-        server << f_shc_delay << db.programs[db.channels[channel].program].cooldown;
-        if(db.programs[db.channels[channel].program].cooldown == 1) {
+      if( dbcooldown[channel] > 0 ) {
+        server << f_shc_delay << dbcooldown[channel];
+        if(dbcooldown[channel] == 1) {
           server << f_shc_1min;
         }
         else {
@@ -877,6 +879,7 @@ void www_editprogram(WebServer &server, WebServer::ConnectionType type, char *ur
       progdone.copy(post.s1);
       delay(10);
       db = ee_getdb();
+      getcooldown();
     }
   }
 
@@ -898,7 +901,7 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
       if (strcmp(parsename, "4")  == 0){post.i4 = atoi(parsevalue);}
     }
 
-    if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65 || post.i4 < 0 ||Â post.i4 > 65) {
+    if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65 || post.i4 < 0 || post.i4 > 65) {
       err_air.copy(post.s1);
       tpl_setair(server);
       return;
@@ -1087,7 +1090,6 @@ int getsunset(time_t t) {
   return s;
 }
 
-char digits[3];
 char* N(int number) {
    /* return a null if the given number is einstellig */
    sprintf(digits, "%02d", number);
@@ -1137,6 +1139,17 @@ int operate(int channel, time_t t) {
   }
   else {
     return LOW;
+  }
+}
+
+void getcooldown() {
+  /*
+   * store configured cooldown time in dbcooldown array
+   * pre-calculated in milliseconds, so we don't have
+   * to do conversion calculations on each loop
+   */
+  for(channel=0; channel<maxchannels; channel++) {
+    dbcooldown[channel] = db.programs[db.channels[channel].program].cooldown * 60000;
   }
 }
 
@@ -1249,27 +1262,35 @@ void check_switches(bool init) {
 
   for(channel=0; channel<numswitches; channel++) {
     swpressed = digitalRead(switches[channel]);
-    if(swpressed && (manual || db.programs[db.channels[channel].program].type == MANUAL)) {
-      // remember how long the channel is already running
-      if(db.programs[db.channels[channel].program].cooldown > 0) {
-        if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
-          cooldown[channel] += (stmoment - sttimer);
-        }
-        else {
-          // reached cooldowntime, init artificially
-          state[channel] = 0;
-        }
-      }
-      if(cooldown[channel] < (db.programs[db.channels[channel].program].cooldown * 60)) {
-         cooldown[channel] += (int)(stmoment - sttimer) / 1000;
-       }
+
+    if(dbcooldown[channel] > 0) {           
+      // program has cooldown time configured
+      if(swpressed && (manual || db.programs[db.channels[channel].program].type == MANUAL)) {       
+	// proposed runtime                          
+	if(cooldown[channel] > dbcooldown[channel]) {
+	  // was long enough off, don't wait anymore, turn it on
+	  state[channel] = 0;
+	}    
+	else {                             
+	  // wait more, time not elapsed yet   
+	  cooldown[channel] += (stmoment - sttimer);
+	}
+      }    
+      else {          
+	// shall be off                           
+	if(cooldown[channel] < dbcooldown[channel]) {
+	  // still time left, add to cooldown more
+	  cooldown[channel] += (stmoment - sttimer); 
+	}
+      } 
     }
+
     if(swpressed != state[channel] || init) {
       if(manual || db.programs[db.channels[channel].program].type == MANUAL) {
 	if(swpressed) {
 	  digitalWrite(leds[channel],   HIGH);
-	  if(db.programs[db.channels[channel].program].cooldown) {
-	    if((cooldown[channel] / 1000) > (db.programs[db.channels[channel].program].cooldown * 60)) {
+	  if(dbcooldown[channel]) {
+	    if(cooldown[channel] > dbcooldown[channel]) {
 	      // ok, it's cooled down enough, switch it
 	      digitalWrite(relays[channel], LOW);
 	    }
@@ -1325,12 +1346,12 @@ void check_timers(bool init) {
         
 	runtime = operate(channel, t);
         
-        if(db.programs[db.channels[channel].program].cooldown > 0) {
+        if(dbcooldown[channel] > 0) {
           // program has cooldown time configured
           if(runtime) {
             // proposed runtime
-            if((cooldown[channel] / 1000) - 1 > (db.programs[db.channels[channel].program].cooldown * 60)) {
-              // was long enohg off, don't wait anymore, turn it on
+            if(cooldown[channel] > dbcooldown[channel]) {
+              // was long enough off, don't wait anymore, turn it on
               runstate[channel] = 0;
             }
             else {
@@ -1340,7 +1361,7 @@ void check_timers(bool init) {
           }
           else {
             // shall be off
-            if((cooldown[channel] / 1000) - 1 < (db.programs[db.channels[channel].program].cooldown * 60)) {
+            if(cooldown[channel] < dbcooldown[channel]) {
               // still time left, add to cooldown more
               cooldown[channel] += (moment - timer);
             }
@@ -1350,8 +1371,8 @@ void check_timers(bool init) {
 	if(runtime != runstate[channel] || init) {
 	  if(runtime) {
 	    /* within operation time, turn the channel on */
-	    if(db.programs[db.channels[channel].program].cooldown > 0) {
-	      if((cooldown[channel] / 1000) > (db.programs[db.channels[channel].program].cooldown * 60)) {
+	    if(dbcooldown[channel] > 0) {
+	      if(cooldown[channel]  > dbcooldown[channel]) {
 		// ok, it's cooled down enough, switch it
 		digitalWrite(relays[channel], LOW);
 	      }
@@ -1946,7 +1967,7 @@ void check_air(bool init) {
         // check air alarm
         t = gettimeofday();
         
-        if(operate(0, t) ||Â operate(1, t)) {
+        if(operate(0, t) || operate(1, t)) {
           // ok, one of the 70W channels is running
           if((alarmpaused / 60000) > alarmwait) {
             // ok, the alarm paused long enough
@@ -1970,7 +1991,6 @@ void check_air(bool init) {
       airtimer = airmoment;
     }
 }
-
 
 
 void setup() {
@@ -2004,6 +2024,7 @@ void setup() {
   blink();
   Serial << f_init_dbread << endl;
   db = ee_getdb();
+  getcooldown();
 
   if(dbversion > db.header.version) {
     alarm();
