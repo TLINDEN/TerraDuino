@@ -88,8 +88,8 @@ uint8_t program = 0;
 bool INIT = true;
 bool RUN  = false;
 uint8_t runtime = 0;
-long cooldown[] = {0, 0, 0, 0, 0, 0};
-long dbcooldown[] = {0, 0, 0, 0, 0, 0};
+long cooldown[] = {0, 0, 0, 0, 0, 0, 0};
+long dbcooldown[] = {0, 0, 0, 0, 0, 0, 0};
 int begin = 0;
 int end = 0;
 
@@ -240,9 +240,15 @@ void tpl_index(WebServer &server) {
   server << tablesm;
   for (channel=0; channel<numchannels; channel++) {
     server << tra << td << chlinkl << channel << chlinkr << names[channel] << chlinke << ':' << tde << td;
-    if(manual || db.programs[db.channels[channel].program].type == MANUAL) {
+    if(manual || db.programs[db.channels[channel].program].type == MANUAL) {
       if(state[channel] == HIGH) {
-        server << irun;
+        if( db.programs[db.channels[channel].program].cooldown > 0 && cooldown[channel] < dbcooldown[channel]) {
+          int diff = (dbcooldown[channel] - cooldown[channel]) / 60000;
+          server << ioff <<  bis << diff;
+        }
+        else {
+          server << irun;
+        }
       }
       else {
         server << ioff;
@@ -250,7 +256,13 @@ void tpl_index(WebServer &server) {
     }
     else {
       if(operate(channel, t)) {
-        server << irun;
+        if( db.programs[db.channels[channel].program].cooldown > 0 && cooldown[channel] < dbcooldown[channel]) {
+          int diff = (dbcooldown[channel] - cooldown[channel]) / 60000;
+          server << ioff <<  bis << diff;
+        }
+        else {
+          server << irun;
+        }
       }
       else {
         server << ioff;
@@ -284,9 +296,9 @@ void tpl_index(WebServer &server) {
       }
     }
     if(db.programs[db.channels[channel].program].type != MANUAL) {
-      if( dbcooldown[channel] > 0 ) {
-        server << f_shc_delay << dbcooldown[channel];
-        if(dbcooldown[channel] == 1) {
+      if( db.programs[db.channels[channel].program].cooldown > 0 ) {
+        server << f_shc_delay << db.programs[db.channels[channel].program].cooldown;
+        if(db.programs[db.channels[channel].program].cooldown == 1) {
           server << f_shc_1min;
         }
         else {
@@ -901,7 +913,7 @@ void www_air(WebServer &server, WebServer::ConnectionType type, char *url_tail, 
       if (strcmp(parsename, "4")  == 0){post.i4 = atoi(parsevalue);}
     }
 
-    if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65 || post.i4 < 0 || post.i4 > 65) {
+    if(post.i2  < 0 || post.i2  > 65 || post.i3 < 0 || post.i3 > 65 || post.i4 < 0 || post.i4 > 65) {
       err_air.copy(post.s1);
       tpl_setair(server);
       return;
@@ -1294,6 +1306,10 @@ void check_switches(bool init) {
 	      // ok, it's cooled down enough, switch it
 	      digitalWrite(relays[channel], LOW);
 	    }
+            else {
+              // nope, keep it off
+              digitalWrite(relays[channel], HIGH);
+            }
 	  }
 	  else {
 	    digitalWrite(relays[channel], LOW);
@@ -1367,7 +1383,6 @@ void check_timers(bool init) {
             }
           }
         }
-
 	if(runtime != runstate[channel] || init) {
 	  if(runtime) {
 	    /* within operation time, turn the channel on */
@@ -1376,6 +1391,10 @@ void check_timers(bool init) {
 		// ok, it's cooled down enough, switch it
 		digitalWrite(relays[channel], LOW);
 	      }
+              else {
+                // nope, keep it off
+                digitalWrite(relays[channel], HIGH);
+              }
 	    }
 	    else {
 	      digitalWrite(relays[channel], LOW);
@@ -1967,7 +1986,7 @@ void check_air(bool init) {
         // check air alarm
         t = gettimeofday();
         
-        if(operate(0, t) || operate(1, t)) {
+        if(operate(0, t) || operate(1, t)) {
           // ok, one of the 70W channels is running
           if((alarmpaused / 60000) > alarmwait) {
             // ok, the alarm paused long enough
