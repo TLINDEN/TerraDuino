@@ -70,18 +70,18 @@ bool manual = false;
 uint8_t mainstatus = 0;
 uint8_t pressed    = 0;
 uint8_t swpressed  = 0;
-long timer = 0;
-long moment = 0;
-long sttimer = 0;
-long stmoment = 0;
-long airtimer = 0;
-long airmoment = 0;
+unsigned long timer = 0;
+unsigned long moment = 0;
+unsigned long sttimer = 0;
+unsigned long stmoment = 0;
+unsigned long airtimer = 0;
+unsigned long airmoment = 0;
 bool airon = false;
-long alarmpaused = 0;
+unsigned long alarmpaused = 0;
 
-const int alarmwait         = 120; // min, 2 hours
-const long timerintervall   = 5000; //orig: 500;
-const long airtimerinterval = 72000; // 10 min
+const unsigned long alarmwait        = 120; // min, 2 hours
+const unsigned long timerintervall   = 5000; //orig: 500;
+const unsigned long airtimerinterval = 72000; // 10 min
 
 uint8_t channel = 0;
 uint8_t program = 0;
@@ -1267,10 +1267,6 @@ void check_switches(bool init) {
   // timers only used for cooldown feature,
   // because this func doesnt have its own timers
   stmoment = millis();
-  if(stmoment < sttimer) {
-    // millis() rolled over, 50 days are gone, reset timer
-    sttimer = 0;
-  }
 
   for(channel=0; channel<numswitches; channel++) {
     swpressed = digitalRead(switches[channel]);
@@ -1348,10 +1344,6 @@ void check_timers(bool init) {
    */
   if(! manual) {
     moment = millis();
-    if(moment < timer) {
-      // millis() rolled over, 50 days are gone, reset timer
-      timer = 0;
-    }
 
     if(init || moment - timer > timerintervall) {
       t = gettimeofday();
@@ -1958,10 +1950,6 @@ void check_air(bool init) {
    * and turns it off if Tmin has been reached.
    */
     airmoment = millis();
-    if(airmoment < airtimer) {
-      // millis() rolled over, 50 days are gone, reset timer
-      airtimer = 0;
-    }
 
     if(init || airmoment - airtimer > airtimerinterval) {
       float T = temperature();
