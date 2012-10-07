@@ -698,6 +698,10 @@ void check_report(bool init) {
      djuri[0] = '\0';
      
      djtimer = djmoment;
+     
+     // we reset the eth after every loop to clean up internal buffers
+     // to avoid hanging after a while
+     reset_eth();
    }
 }
 
@@ -1556,18 +1560,8 @@ void setup() {
 
   blink();
   Serial << f_init << f_init_eth << db.settings.octet1 << '.' << db.settings.octet2 << '.' << db.settings.octet3 << '.' << db.settings.octet4 << endl;
- 
-#ifndef LOCAL 
-  byte ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
-  byte gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
-#else  
-  byte ip[] = { 10,1,1,2};
-  byte gw[] = { 10,1,1,1};
-#endif
+  reset_eth();
 
-  byte net[]= { 255, 255, 255, 0 };
-
-  Ethernet.begin(mac, ip, named, gw, net);
   
   /* finally enable watchdog and set PAT timeout */
   blink();
@@ -1583,6 +1577,17 @@ void setup() {
   booted = gettimeofday();
 }
 
+void reset_eth() {
+#ifndef LOCAL 
+  byte ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
+  byte gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
+#else  
+  byte ip[] = { 10,1,1,2};
+  byte gw[] = { 10,1,1,1};
+#endif
+  byte net[]= { 255, 255, 255, 0 };
+  Ethernet.begin(mac, ip, named, gw, net);
+}
 
 void loop() {
   check_main(RUN);
