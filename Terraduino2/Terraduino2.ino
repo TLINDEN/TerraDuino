@@ -1,5 +1,5 @@
 /* -*-c-*-
- * Terraduino Terrarium Controller with Arduino.
+ * Terraduino2 Terrarium Controller with Arduino.
  *
  * Copyright (c) 2012 Thomas Linden
  *
@@ -56,6 +56,9 @@
 #define PINON  'X'
 #define PINOFF '-'
 #define MAXUP 86400 // after 1 day uptime keep the value
+
+// if running via macbook or via router, uncomment to run via router
+//#define LOCAL
 
 /* global vars */
 time_t t = 0;
@@ -164,9 +167,12 @@ struct POST {
 } post;
 
 IPAddress djserver(212,227,251,58);
+//IPAddress djserver(192,168,128,1);
 const char djhostname[] = "www.daemon.de";
 EthernetClient djclient;
 char djuri[80];
+byte named[] = { 141,1,1,1 };
+
 /*
  * We are not using the internal tone()
  * function because it just doesn't work in my setup,
@@ -186,104 +192,155 @@ void playTone(int tone, int duration) {
 /***********************************/
 
 void djput (char djuri[80]) {
- if (djclient.connect(djserver, 80)) {
+  Serial << "djput: " << djuri << endl;
+  if (djclient.connect(djserver, 80)) {
     djclient.print("GET ");
     djclient.print(djuri);
-    djclient.print(" HTTP/1.0");
-    djclient.println();
-    
+    djclient.println(" HTTP/1.0");
     djclient.print("Host: ");
-    djclient.print(djhostname);
-    djclient.println();
-    
+    djclient.println(djhostname);
     djclient.println("Connection: close");
     djclient.println();
-    djclient.println();
+    //Serial << "headers sent" << endl;
+    while(djclient.connected()) {
+      //Serial << "Still connected" << endl;
+      while(djclient.available()) {
+        // we've come so far, abort, we're not interested in any output for now
+        djclient.stop();
+      }
+      //Serial << endl << "Done reading for now..." << endl;
+    }
+    //Serial << "no more connected" << endl;
     djclient.stop();
  } 
  else {
     // if you couldn't make a connection:
-    Serial.println("connection failed");
-    Serial.println();
-    Serial.println("disconnecting.");
+    //Serial.println("connection failed");
     djclient.stop();
   }
 }
 
-void djchekmodified (char djuri[80]) {
- if (djclient.connect(djserver, 80)) {
+void djcheckmodified (char djuri[80]) {
+ /*
+  * Connect to django and fetch modified channel and program configs, if any.
+  * Output will be in csv format, parse it and store changed channels and programs
+  * in temporary lists during parsing, which leads to faster disconnect from http.
+  * after the disconnect all changed channels and programs will be saved to eeprom
+  * individually, the db fetched back to memory and cooldowns updated.
+  */
+  Serial << "djcheckmodified: " << djuri << endl;
+  if (djclient.connect(djserver, 80)) {
+    //Serial << "Connected" << endl;
     djclient.print("GET ");
     djclient.print(djuri);
-    djclient.print(" HTTP/1.0");
-    djclient.println();
-    
+    djclient.println(" HTTP/1.0");
     djclient.print("Host: ");
-    djclient.print(djhostname);
-    djclient.println();
-    
+    djclient.println(djhostname);
     djclient.println("Connection: close");
     djclient.println();
-    djclient.println();
     
+    char data[512];
+    data[0] = '\0';
+    int datacount = 0;
     char line[80];
+    line[0] = '\0';
     index = 0;
     
-    for(;;) {
-      if (djclient.available()) {
-        char c = djclient.read();
-        Serial.print(c);
+    bool changed = false;
+    Program plist[32];
+    Channel clist[8];
+    
+    plist[0].id = 0;
+    clist[0].id = 0;
+    
+    int pcount = 0;
+    int ccount = 0;
+    char c = 0;
+    
+    while(djclient.connected()) {
+      //Serial << "Still connected" << endl;
+      while(djclient.available()) {
+        if(datacount == 511) {
+          djclient.stop();
+        }
+        else {
+          data[datacount] = djclient.read();
+          //Serial.write(data[datacount]);
+          datacount++;
+        }
+      }
+      //Serial << "Done reading for now..." << endl;
+    }
+    djclient.stop();
+    
+    //Serial << "Got: " << endl << data << endl;
+    
+    for(int pos=0; pos < datacount; pos++) {
+        c = data[pos];
         if(c == '\n') {
           // line complete
           if(line[0] == 'c') {
            // channel 
-           scanf("c,%d,%d", post.i1, post.i2);
+           //Serial << "Channel: " << line << endl;
+           sscanf(line, "c,%d,%d", &post.i1, &post.i2);
            Channel ch = db.channels[post.i1];
            ch.program = post.i2;
-           ee_wr_channel(ch);
-           delay(10);
-           db = ee_getdb();
+           Serial << "Parsed Channel " << post.i1 << " using program " << post.i2 << endl;
+           changed = true;
+           clist[ccount] = ch;
+           ccount++;
            resetpost();
           }
           else if(line[0] == 'p') {
            // program 
-           scanf("p,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", post.i1, post.i2, post.i3, post.i4, post.i5, post.i6, post.i7, post.i8, post.i9, post.i10, post.i11);
-                 Program p = db.programs[post.i1];
-                 p.type       = post.i12;
-                 p.start_hour = post.i4;
-                 p.start_min  = post.i5;
-                 p.stop_hour  = post.i6;
-                 p.stop_min   = post.i7;
-                 p.start_delay= post.i2;
-                 p.stop_delay = post.i3;
-                 p.cooldown   = post.i8;
-                 p.sleep_day  = post.i9;
-                 p.sleep_mon  = post.i10;
-                 p.sleep_increment  = post.i11;
-                 ee_wr_program(p);
-                 delay(10);
-                 db = ee_getdb();
-                 getcooldown();
+           Serial << "Program: " << line << endl;
+           // p,6,0,0,0,0,0,0,0,0,0,0,1
+           sscanf(line, "p,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &post.i1, &post.i2, &post.i3, &post.i4, &post.i5,
+                                          &post.i6, &post.i7, &post.i8, &post.i9, &post.i10, &post.i11, &post.i12);
+           Program p = db.programs[post.i1];
+           p.type       = post.i12;
+           p.start_hour = post.i4;
+           p.start_min  = post.i5;
+           p.stop_hour  = post.i6;
+           p.stop_min   = post.i7;
+           p.start_delay= post.i2;
+           p.stop_delay = post.i3;
+           p.cooldown   = post.i8;
+           p.sleep_day  = post.i9;
+           p.sleep_mon  = post.i10;
+           p.sleep_increment  = post.i11;
+           Serial << "Parsed Program " << post.i1 << ": type " << p.type << ", start delay " << p.start_delay << ", stop delay: " << p.stop_delay << endl;
+           changed = true;
+           plist[pcount] = p;
+           pcount++;
+           resetpost();
           }
           index = 0;
           line[index] = '\0';
         }
         else if (c != '\r') {
+          // regular char no beginning of newline
           line[index] = c;
           index++;
           line[index] = '\0';
         }
       }
-      else {
-       djclient.stop();
-       return; 
+
+    if(changed) {
+      for (index=0; index < ccount; index++) {
+        ee_wr_channel(clist[index]);
+        delay(10);
       }
+      for (index=0; index < pcount; index++) {
+        ee_wr_program(plist[index]);
+        delay(10);
+      }
+      db = ee_getdb();
+      getcooldown();
     }
  } 
  else {
-    // if you couldn't make a connection:
-    Serial.println("connection failed");
-    Serial.println();
-    Serial.println("disconnecting.");
+    //Serial.println("connection failed");
     djclient.stop();
   }
 }
@@ -498,16 +555,25 @@ int operate(int channel, time_t t) {
 }
 
 int coperate(int channel, time_t t) {
+ if(db.programs[db.channels[channel].program].type == MANUAL) {
+   return state[channel];
+ }
+ 
  if(operate(channel, t)) {
-  if( db.programs[db.channels[channel].program].cooldown > 0 && cooldown[channel] < dbcooldown[channel]) {
-    return LOW;
+  if( db.programs[db.channels[channel].program].cooldown > 0) {
+    if(cooldown[channel] < dbcooldown[channel]) {
+      return LOW;
+    }
+    else {
+      return HIGH;
+    }
   }
   else {
-    return HIGH;
+   return HIGH; 
   }
  }
  else {
-  return LOW; 
+   return LOW; 
  }
 }
 
@@ -586,9 +652,10 @@ void alarm() {
   playTone(NOTE_G, 500);
 }
 
+
 void check_report(bool init) {
   /*
-   * Posts report and status data every 5 minutes to django
+   * Posts report and status data every 5 minutes to django & look if some config has been changed
    *
    * URL zum posten der report und status daten:
    * http://www.daemon.de/td/0/0/0/0/0/0/0/0/23/44/1349439160/4500/123122/
@@ -598,7 +665,15 @@ void check_report(bool init) {
    djmoment = millis();
    if(init || djmoment - djtimer > djtimerintervall) {
      t = gettimeofday();
-     sprintf(djuri, "/td/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/",
+     char supti[32];
+     char shumi[16];
+     char stemp[16];
+     char stime[32];
+     dtostrf(uptime, 1, 0, supti);
+     dtostrf(humidity(), 5, 2, shumi);
+     dtostrf(temperature(), 5, 2, stemp);
+     dtostrf(t, 10, 0, stime);
+     sprintf(djuri, "/td/%u/%u/%u/%u/%u/%u/%u/%u/%s/%s/%s/%u/%s/",
         coperate(0, t),
         coperate(1, t),
         coperate(2, t),
@@ -607,18 +682,19 @@ void check_report(bool init) {
         coperate(5, t),
         coperate(6, t),
         coperate(7, t),
-        temperature(),
-        humidity(),
-        t,
+        stemp,
+        shumi,
+        stime,
         freeMemory(),
-        uptime);
+        supti
+     );
      djput(djuri);
      djuri[0] = '\0';
      
      delay(10);
      
      sprintf(djuri, "/td/modified/");
-     djchekmodified(djuri);
+     djcheckmodified(djuri);
      djuri[0] = '\0';
      
      djtimer = djmoment;
@@ -1480,10 +1556,18 @@ void setup() {
 
   blink();
   Serial << f_init << f_init_eth << db.settings.octet1 << '.' << db.settings.octet2 << '.' << db.settings.octet3 << '.' << db.settings.octet4 << endl;
-  uint8_t ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
-  uint8_t gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
-  uint8_t net[]= { 255, 255, 255, 0 };
-  Ethernet.begin(mac, ip, gw, net);
+ 
+#ifndef LOCAL 
+  byte ip[] = { db.settings.octet1, db.settings.octet2, db.settings.octet3, db.settings.octet4 };
+  byte gw[] = { db.settings.gw1, db.settings.gw2, db.settings.gw3, db.settings.gw4 };
+#else  
+  byte ip[] = { 10,1,1,2};
+  byte gw[] = { 10,1,1,1};
+#endif
+
+  byte net[]= { 255, 255, 255, 0 };
+
+  Ethernet.begin(mac, ip, named, gw, net);
   
   /* finally enable watchdog and set PAT timeout */
   blink();
