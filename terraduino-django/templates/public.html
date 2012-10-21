@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Terraduino Status{% endblock %}
+{% block breiterinhalt %}
+    <div id="main">
+	<div class="row-fluid">
+		<div class="span4 well">
+			<div>
+			<b>Temperatur</b><br/>
+			<a href="/mrtg/14all.cgi?log=temp"><img src="/mrtg/14all.cgi?log=temp&png=daily.s&small=1" alt="Temperatur"/></a>
+			</div>
+			<div>
+			<b>Luftfeuchtigkeit</b><br/>
+			<a href="/mrtg/14all.cgi?log=humidity"><img src="/mrtg/14all.cgi?log=humidity&png=daily.s&small=1" alt="Luftfeuchtigkeit"/></a>
+			</div>
+			<div>
+			<b>Uptime</b><br/>
+			<a href="/mrtg/14all.cgi?log=uptime"><img src="/mrtg/14all.cgi?log=uptime&png=daily.s&small=1" alt="uptime"/></a>
+			</div>
+		</div>
+		<div class="span8 well">
+			<div>
+			<b>Aktuelle Werte</b>
+			<table class="table table-stripped table-bordered table-hover table-condensed">
+			<tr><th>Temperatur</th><td>{{ log.temperature }} Grad C</td></tr>
+			<tr><th>Luftfeuchtigkeit</th><td>{{ log.humidity }} %</td></tr>
+			<tr><th>Zeit</th><td>{{ log.devicedate|date:"d.m.Y H:i" }}</td></tr>
+			<tr><th>Freier Speicher</th><td>{{ log.freememory }}</td></tr>
+			</table>
+			</div>
+		
+			<div>
+			<b>Kan&auml;le</b>
+			<table class="table table-stripped table-bordered table-hover table-condensed">
+			<tr><th>Kanal</th><th>Status</th><th>Programm</th></tr>
+			{% for channel in channels %}
+			   <tr>
+				<td>{{ channel.number }}: {{ channel.name }}</td>
+				<td>
+				   {% if channel.operates %}
+					<img src="/media/img/admin/icon-yes.gif">
+				   {% else %}
+					<img src="/media/img/admin/icon-no.gif">
+				   {% endif %}
+				</td>
+				<td>{{ channel.program }}</td>
+			   </tr>
+			{% endfor %}
+			</table>
+			</div>
+      			<DIV>
+				<B>Strom/Kan&auml;le</B>
+      				<A HREF="/mrtg/14all.cgi?log=channel1&amp;">Kanal 1</A><br/>
+      				<A HREF="/mrtg/14all.cgi?log=channel2&amp;">Kanal 2</A><br/>
+      				<A HREF="/mrtg/14all.cgi?log=channel3&amp;">Kanal 3</A><br/>
+      				<A HREF="/mrtg/14all.cgi?log=channel4&amp;">Kanal 4</A><br/>
+      				<A HREF="/mrtg/14all.cgi?log=channel5&amp;">Kanal 5</A><br/>
+      				<A HREF="/mrtg/14all.cgi?log=channel6&amp;">Kanal 6</A><br/>
+      				<A HREF="var/kwhlog.txt">kW/h Gesamtverbrauch / Tag Logfile</A><br/>
+      				<A HREF="/mrtg/">MRTG Hauptseite direkt Zugriff</A><br/>
+   			</DIV>
+		</div>
+	</div>
+    </div>
+
+{% endblock %}
+

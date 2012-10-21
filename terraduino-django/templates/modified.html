@@ -1,0 +1,3 @@
+{% for c in channels %}c,{{ c.number }},{{ c.program.number }}
+{% endfor %}{% for p in programs %}p,{{ p.number }},{{ p.start_delay }},{{ p.stop_delay }},{{ p.start.hour|default:"0" }},{{ p.start.minute|default:"0" }},{{ p.stop.hour|default:"0" }},{{ p.stop.minute|default:"0" }},{{ p.cooldown }},{{ p.sleep.day|default:"0" }},{{ p.sleep.month|default:"0" }},{{ p.sleep_increment }},{{ p.type }}
+{% endfor %}
