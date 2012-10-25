@@ -1668,6 +1668,7 @@ void loop() {
   check_air(RUN);
   check_shell();
   check_report(RUN);
+  check_reboot();
   wdt_reset();
 }
 
