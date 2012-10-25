@@ -103,7 +103,7 @@ int begin = 0;
 int end = 0;
 
 // serial parser vars
-int     value[4];
+int     value[8];
 uint8_t nvalue = 0;
 char    buffer[5];
 byte    idx = 0;
@@ -695,20 +695,26 @@ int freeRam () {
 
 
 char slash[2] = "/";
-char dj[][13] = { "0", "0", "0", "0", "0", "0", "0", "0", "00.00", "00.00", "0000000000", "0000", "0000000000" };
+char dj[][14] = { "0", "0", "0", "0", "0", "0", "0", "0", "00.00", "00.00", "0000000000", "0000000000", "0000", "0000" };
 
 void check_report(bool init) {
   /*
    * Posts report and status data every 5 minutes to django & look if some config has been changed
    *
    * URL zum posten der report und status daten:
-   * http://www.daemon.de/td/0/0/0/0/0/0/0/0/23/44/1349439160/4500/123122/
-   * Felder: c1, c2, c3, c4, c5, c6, c7, c8, t, h, ts, mem, uptime
+   * old: http://www.daemon.de/td/0/0/0/0/0/0/0/0/23/44/1349439160/4500/123122/
+   * new: http://www.daemon.de/td/0/0/0/0/0/0/0/0/23/44/1349439160/123122/530/1920/
+   * Felder: c1, c2, c3, c4, c5, c6, c7, c8, t, h, ts, uptime, sunrise, sunset
    *
    */
    djmoment = millis();
    if(init || djmoment - djtimer > djtimerintervall) {
      t = gettimeofday();
+
+     begin = getsunrise(t); // int minutes
+     delay(1);
+     end   = getsunset(t);
+
      for (channel=0; channel<numchannels; channel++) {
        itoa(coperate(channel, t), dj[channel], 10);
      }
@@ -716,12 +722,12 @@ void check_report(bool init) {
      dtostrf(temperature(), 4, 2, dj[8]);
      dtostrf(humidity(),    4, 2, dj[9]);
      dtostrf(t,            10, 0, dj[10]);
-     dtostrf(freeRam(),  1, 0, dj[11]);
-     //dtostrf(0.0,  1, 0, dj[11]);
-     dtostrf(uptime,        1, 0, dj[12]);
+     dtostrf(uptime,        1, 0, dj[11]);
+     dtostrf(begin,         3, 0, dj[12]);
+     dtostrf(end,           3, 0, dj[13]);
      djuri[0] = '\0';
      strncat(djuri, "/td/", 4);
-     for (channel=0; channel<13; channel++) {
+     for (channel=0; channel<14; channel++) {
        strncat(djuri, dj[channel], strlen(dj[channel]));
        strncat(djuri, slash, 1);
      }
@@ -737,10 +743,17 @@ void check_report(bool init) {
      
      // we reset the eth after every loop to clean up internal buffers
      // to avoid hanging after a while
-     reset_eth();
+     //reset_eth();
    }
 }
 
+
+void check_reboot() {
+  if ( uptime > 10000 && hour(t) == 0 ) {
+    // midnight. reboot.
+    software_Reset();
+  }
+}
 
 void check_switches(bool init) {
   /*
@@ -1025,10 +1038,9 @@ void sh_air(char parameter[MAXBYTES]) {
    */
   if(parameter[0] != '\0') {
     // air params given, parse it
-    int value[2];
-    int nvalue;
-    char buffer[2];
-    byte idx = 0;
+    nvalue = 0;
+    idx = 0;
+    buffer[0] = '\0';
     for(i=0; parameter[i]; i++) {
       if(parameter[i] > '0' || parameter[i] < '9') {
 	// a digit
@@ -1036,7 +1048,7 @@ void sh_air(char parameter[MAXBYTES]) {
 	idx++;
 	buffer[idx] = '\0';
       }
-      else if(parameter[i] == ':') {
+      else if(parameter[i] == ' ') {
 	// one value done
 	value[nvalue] = atoi(buffer);
 	nvalue++;
@@ -1099,6 +1111,7 @@ void sh_ip(char parameter[MAXBYTES]) {
     // ip given, parse it
     nvalue = 0;
     idx    = 0;
+    buffer[0] = '\0';
     for(i=0; parameter[i]; i++) {
       if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
@@ -1106,8 +1119,8 @@ void sh_ip(char parameter[MAXBYTES]) {
 	idx++;
 	buffer[idx] = '\0';
       }
-      else if(parameter[i] == '.') {
-	// one octet done
+      else if(parameter[i] == '.' || parameter[i] == ' ') {
+	// one octet done or ip done, begin of gw
 	value[nvalue] = atoi(buffer);
 	nvalue++;
 	idx = 0;
@@ -1127,13 +1140,13 @@ void sh_ip(char parameter[MAXBYTES]) {
       buffer[0] = '\0';
     }
     
-    if(nvalue != 4) {
+    if(nvalue != 8) {
       beep();
       Serial << f_sherr_form << f_sherr_exip << endl;
       return;
     }
     else {
-      for(i=0; i<4; i++) {
+      for(i=0; i<8; i++) {
 	if(value[i] < 0 || value[i] > 255) {
 	  beep();
           Serial << f_sherr_form << f_sherr_exoct << endl;
@@ -1146,12 +1159,20 @@ void sh_ip(char parameter[MAXBYTES]) {
       S.octet2 = value[1];
       S.octet3 = value[2];
       S.octet4 = value[3];
+      S.gw1 = value[3];
+      S.gw2 = value[4];
+      S.gw3 = value[5];
+      S.gw4 = value[6];
       ee_wr_settings(S);
       db = ee_getdb();
       ip[0] = db.settings.octet1;
       ip[1] = db.settings.octet2;
       ip[2] = db.settings.octet3;
-      ip[3] = db.settings.octet4;
+      ip[3] = db.settings.octet4;  
+      gw[0] = db.settings.gw1;
+      gw[1] = db.settings.gw2;
+      gw[2] = db.settings.gw3;
+      gw[3] = db.settings.gw4;
       reset_eth();
       Serial << f_sht_ipsav << value[0] << '.' << value[1] << '.' << value[2] << '.' << value[3] << endl;
       
@@ -1174,6 +1195,7 @@ void sh_setdate(char parameter[MAXBYTES]) {
     // date given, parse it
     nvalue = 0;
     idx = 0;
+    buffer[0] = '\0';
     for(i=0; parameter[i]; i++) {
       if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit
@@ -1247,6 +1269,9 @@ void sh_settime(char parameter[MAXBYTES]) {
    */
   if(parameter[0] != '\0') {
     // time given, parse it
+    nvalue = 0;
+    idx = 0;
+    buffer[0] = '\0';
     for(i=0; parameter[i]; i++) {
       if(parameter[i] >= '0' && parameter[i] <= '9') {
 	// a digit

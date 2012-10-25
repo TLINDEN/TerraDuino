@@ -3,12 +3,6 @@
 
 #include "w5100.h"
 
-uint8_t socketstatus=0;
-uint16_t ret=0;
-uint16_t freesize=0;
-uint8_t head[8];
-uint16_t data_len=0;
-uint16_t ptr=0;
 
 extern uint8_t socket(SOCKET s, uint8_t protocol, uint16_t port, uint8_t flag); // Opens a socket(TCP or UDP or IP_RAW mode)
 extern void close(SOCKET s); // Close socket

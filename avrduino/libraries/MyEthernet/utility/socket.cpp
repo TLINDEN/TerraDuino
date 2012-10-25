@@ -3,6 +3,13 @@
 
 static uint16_t local_port;
 
+uint8_t socketstatus=0;
+uint16_t ret=0;
+uint16_t freesize=0;
+uint8_t head[8];
+uint16_t data_len=0;
+uint16_t ptr=0;
+
 /**
  * @brief	This Socket function initialize the channel in perticular mode, and set the port and wait for W5100 done it.
  * @return 	1 for success else 0.

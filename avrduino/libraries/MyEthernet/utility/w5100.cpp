@@ -13,6 +13,8 @@
 
 #include "w5100.h"
 
+uint16_t bcount;
+
 // W5100 controller instance
 W5100Class W5100;
 

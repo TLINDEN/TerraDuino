@@ -347,7 +347,8 @@ private:
   //uint16_t bcount;
   uint16_t src_mask, src_ptr;
 };
-uint16_t bcount;
+
+//uint16_t bcount;
 extern W5100Class W5100;
 
 uint8_t W5100Class::readSn(SOCKET _s, uint16_t _addr) {
