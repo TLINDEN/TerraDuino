@@ -64,6 +64,8 @@ void EthernetClass::begin(uint8_t *mac, IPAddress local_ip, IPAddress dns_server
   W5100.setIPAddress(local_ip._address);
   W5100.setGatewayIp(gateway._address);
   W5100.setSubnetMask(subnet._address);
+  W5100.setRetransmissionCount(1); // scip: default is hardcoded as 3
+  W5100.setRetransmissionTime(50); // scip: 50ms, default: 10s or so
   _dnsServerAddress = dns_server;
 }
 

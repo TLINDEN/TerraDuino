@@ -31,6 +31,9 @@
 #include "Ethernet.h"
 #include "EthernetClient.h"
 
+// http://www.blake-foster.com/project.php?p=44
+#include "ICMPPing.h"
+
 /* atoi ... */
 #include <stdio.h>
 
@@ -170,6 +173,7 @@ struct POST {
 } post;
 
 IPAddress djserver(212,227,251,58);
+byte pingip[] = {212,227,251,58};
 //IPAddress djserver(192,168,128,1);
 const char djhostname[] = "www.daemon.de";
 EthernetClient djclient;
@@ -191,6 +195,10 @@ char shumi[16];
 char stemp[16];
 char stime[32];
 
+SOCKET pingSocket = 0;
+
+/***********************************/
+
 /*
  * We are not using the internal tone()
  * function because it just doesn't work in my setup,
@@ -207,7 +215,6 @@ void playTone(int tone, int duration) {
   }
 }
 
-/***********************************/
 
 void resetpost() {
  post.i1 = 0;
@@ -242,6 +249,15 @@ void getcooldown() {
 void reset_eth() {
   delay(5);
   Ethernet.begin(mac, ip, named, gw, mask);
+}
+
+bool inetavailable() {
+  bool connected;
+  ICMPPing ping(pingSocket);
+  data[0] = '\0';
+  connected = ping(1, pingip, data);
+  Serial << "ping " << data << endl;
+  return connected;
 }
 
 void djput (char djuri[80]) {
@@ -709,36 +725,39 @@ void check_report(bool init) {
    */
    djmoment = millis();
    if(init || djmoment - djtimer > djtimerintervall) {
-     t = gettimeofday();
+     if(inetavailable()) {
 
-     begin = getsunrise(t); // int minutes
-     delay(1);
-     end   = getsunset(t);
+       t = gettimeofday();
 
-     for (channel=0; channel<numchannels; channel++) {
-       itoa(coperate(channel, t), dj[channel], 10);
+       begin = getsunrise(t); // int minutes
+       delay(1);
+       end   = getsunset(t);
+
+       for (channel=0; channel<numchannels; channel++) {
+	 itoa(coperate(channel, t), dj[channel], 10);
+       }
+
+       dtostrf(temperature(), 4, 2, dj[8]);
+       dtostrf(humidity(),    4, 2, dj[9]);
+       dtostrf(t,            10, 0, dj[10]);
+       dtostrf(uptime,        1, 0, dj[11]);
+       dtostrf(begin,         3, 0, dj[12]);
+       dtostrf(end,           3, 0, dj[13]);
+       djuri[0] = '\0';
+       strncat(djuri, "/td/", 4);
+       for (channel=0; channel<14; channel++) {
+	 strncat(djuri, dj[channel], strlen(dj[channel]));
+	 strncat(djuri, slash, 1);
+       }
+       djput(djuri);
+
+       delay(10);
+       djuri[0] = '\0';
+       strncat(djuri, "/td/modified/", 13);
+       djcheckmodified(djuri);
+       djuri[0] = '\0';
      }
 
-     dtostrf(temperature(), 4, 2, dj[8]);
-     dtostrf(humidity(),    4, 2, dj[9]);
-     dtostrf(t,            10, 0, dj[10]);
-     dtostrf(uptime,        1, 0, dj[11]);
-     dtostrf(begin,         3, 0, dj[12]);
-     dtostrf(end,           3, 0, dj[13]);
-     djuri[0] = '\0';
-     strncat(djuri, "/td/", 4);
-     for (channel=0; channel<14; channel++) {
-       strncat(djuri, dj[channel], strlen(dj[channel]));
-       strncat(djuri, slash, 1);
-     }
-     djput(djuri);
-
-     delay(10);
-     djuri[0] = '\0';
-     strncat(djuri, "/td/modified/", 13);
-     djcheckmodified(djuri);
-     djuri[0] = '\0';
-     
      djtimer = djmoment;
      
      // we reset the eth after every loop to clean up internal buffers
